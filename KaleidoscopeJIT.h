@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_EXECUTIONENGINE_ORC_KALEIDOSCOPEJIT_H
-#define LLVM_EXECUTIONENGINE_ORC_KALEIDOSCOPEJIT_H
+#ifndef KALEIDOSCOPEJIT_H
+#define KALEIDOSCOPEJIT_H
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ExecutionEngine/JITSymbol.h"
@@ -32,100 +32,94 @@
 #include "llvm/Transforms/Scalar/GVN.h"
 #include <memory>
 
-namespace llvm {
-namespace orc {
-
 class KaleidoscopeJIT {
-private:
-  std::unique_ptr<ExecutionSession> ES;
+    private:
+        std::unique_ptr<llvm::orc::ExecutionSession> ES;
 
-  DataLayout DL;
-  MangleAndInterner Mangle;
+        llvm::DataLayout DL;
+        llvm::orc::MangleAndInterner Mangle;
 
-  RTDyldObjectLinkingLayer ObjectLayer;
-  IRCompileLayer CompileLayer;
-  IRTransformLayer OptimizeLayer;
+        llvm::orc::RTDyldObjectLinkingLayer ObjectLayer;
+        llvm::orc::IRCompileLayer CompileLayer;
+        llvm::orc::IRTransformLayer OptimizeLayer;
 
-  JITDylib &MainJD;
+        llvm::orc::JITDylib &MainJD;
 
-public:
-  KaleidoscopeJIT(std::unique_ptr<ExecutionSession> ES,
-                  JITTargetMachineBuilder JTMB, DataLayout DL)
-      : ES(std::move(ES)), DL(std::move(DL)), Mangle(*this->ES, this->DL),
-        ObjectLayer(*this->ES,
-                    []() { return std::make_unique<SectionMemoryManager>(); }),
-        CompileLayer(*this->ES, ObjectLayer,
-                     std::make_unique<ConcurrentIRCompiler>(std::move(JTMB))),
-        OptimizeLayer(*this->ES, CompileLayer, optimizeModule),
-        MainJD(this->ES->createBareJITDylib("<main>")) {
-    MainJD.addGenerator(
-        cantFail(DynamicLibrarySearchGenerator::GetForCurrentProcess(
-            DL.getGlobalPrefix())));
-  }
+    public:
+        KaleidoscopeJIT(std::unique_ptr<llvm::orc::ExecutionSession> ES,
+                llvm::orc::JITTargetMachineBuilder JTMB, llvm::DataLayout DL)
+            : ES(std::move(ES)), DL(std::move(DL)), Mangle(*this->ES, this->DL),
+            ObjectLayer(*this->ES,
+                    []() { return std::make_unique<llvm::SectionMemoryManager>(); }),
+            CompileLayer(*this->ES, ObjectLayer,
+                    std::make_unique<llvm::orc::ConcurrentIRCompiler>(std::move(JTMB))),
+            OptimizeLayer(*this->ES, CompileLayer, optimizeModule),
+            MainJD(this->ES->createBareJITDylib("<main>")) {
+                MainJD.addGenerator(
+                        cantFail(llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
+                                DL.getGlobalPrefix())));
+            }
 
-  ~KaleidoscopeJIT() {
-    if (auto Err = ES->endSession())
-      ES->reportError(std::move(Err));
-  }
+        ~KaleidoscopeJIT() {
+            if (auto Err = ES->endSession())
+                ES->reportError(std::move(Err));
+        }
 
-  static Expected<std::unique_ptr<KaleidoscopeJIT>> Create() {
-    auto EPC = SelfExecutorProcessControl::Create();
-    if (!EPC)
-      return EPC.takeError();
+        static llvm::Expected<std::unique_ptr<KaleidoscopeJIT>> Create() {
+            auto EPC = llvm::orc::SelfExecutorProcessControl::Create();
+            if (!EPC)
+                return EPC.takeError();
 
-    auto ES = std::make_unique<ExecutionSession>(std::move(*EPC));
+            auto ES = std::make_unique<llvm::orc::ExecutionSession>(std::move(*EPC));
 
-    JITTargetMachineBuilder JTMB(
-        ES->getExecutorProcessControl().getTargetTriple());
+            llvm::orc::JITTargetMachineBuilder JTMB(
+                    ES->getExecutorProcessControl().getTargetTriple());
 
-    auto DL = JTMB.getDefaultDataLayoutForTarget();
-    if (!DL)
-      return DL.takeError();
+            auto DL = JTMB.getDefaultDataLayoutForTarget();
+            if (!DL)
+                return DL.takeError();
 
-    return std::make_unique<KaleidoscopeJIT>(std::move(ES), std::move(JTMB),
-                                             std::move(*DL));
-  }
+            return std::make_unique<KaleidoscopeJIT>(std::move(ES), std::move(JTMB),
+                    std::move(*DL));
+        }
 
-  const DataLayout &getDataLayout() const { return DL; }
+        const llvm::DataLayout &getDataLayout() const { return DL; }
 
-  JITDylib &getMainJITDylib() { return MainJD; }
+        llvm::orc::JITDylib &getMainJITDylib() { return MainJD; }
 
-  Error addModule(ThreadSafeModule TSM, ResourceTrackerSP RT = nullptr) {
-    if (!RT)
-      RT = MainJD.getDefaultResourceTracker();
+        llvm::Error addModule(llvm::orc::ThreadSafeModule TSM, llvm::orc::ResourceTrackerSP RT = nullptr) {
+            if (!RT)
+                RT = MainJD.getDefaultResourceTracker();
 
-    return OptimizeLayer.add(RT, std::move(TSM));
-  }
+            return OptimizeLayer.add(RT, std::move(TSM));
+        }
 
-  Expected<JITEvaluatedSymbol> lookup(StringRef Name) {
-    return ES->lookup({&MainJD}, Mangle(Name.str()));
-  }
+        llvm::Expected<llvm::JITEvaluatedSymbol> lookup(llvm::StringRef Name) {
+            return ES->lookup({&MainJD}, Mangle(Name.str()));
+        }
 
-private:
-  static Expected<ThreadSafeModule>
-  optimizeModule(ThreadSafeModule TSM, const MaterializationResponsibility &R) {
-    TSM.withModuleDo([](Module &M) {
-      // Create a function pass manager.
-      auto FPM = std::make_unique<legacy::FunctionPassManager>(&M);
+    private:
+        static llvm::Expected<llvm::orc::ThreadSafeModule>
+            optimizeModule(llvm::orc::ThreadSafeModule TSM, const llvm::orc::MaterializationResponsibility &R) {
+                TSM.withModuleDo([](llvm::Module &M) {
+                        // Create a function pass manager.
+                        auto FPM = std::make_unique<llvm::legacy::FunctionPassManager>(&M);
 
-      // Add some optimizations.
-      FPM->add(createInstructionCombiningPass());
-      FPM->add(createReassociatePass());
-      FPM->add(createGVNPass());
-      FPM->add(createCFGSimplificationPass());
-      FPM->doInitialization();
+                        // Add some optimizations.
+                        FPM->add(llvm::createInstructionCombiningPass());
+                        FPM->add(llvm::createReassociatePass());
+                        FPM->add(llvm::createGVNPass());
+                        FPM->add(llvm::createCFGSimplificationPass());
+                        FPM->doInitialization();
 
-      // Run the optimizations over all functions in the module being added to
-      // the JIT.
-      for (auto &F : M)
-        FPM->run(F);
-    });
+                        // Run the optimizations over all functions in the module being added to
+                        // the JIT.
+                        for (auto &F : M)
+                        FPM->run(F);
+                        });
 
-    return std::move(TSM);
-  }
+                return std::move(TSM);
+            }
 };
 
-} // end namespace orc
-} // end namespace llvm
-
-#endif // LLVM_EXECUTIONENGINE_ORC_KALEIDOSCOPEJIT_H
+#endif // KALEIDOSCOPEJIT_H

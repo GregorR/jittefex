@@ -1,3 +1,15 @@
+//===- toy.cc - A simple JIT for Kaleidoscope -------------------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// Contains a simple JIT definition for use in the kaleidoscope tutorials.
+//
+//===----------------------------------------------------------------------===//
+
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/BasicBlock.h"
