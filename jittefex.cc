@@ -1,5 +1,15 @@
 #include "jittefex/jittefex.h"
 
+#ifdef JITTEFEX_HAVE_LLVM
+#include "llvm/ExecutionEngine/Orc/CompileUtils.h"
+#include "llvm/ExecutionEngine/Orc/ExecutionUtils.h"
+#include "llvm/ExecutionEngine/SectionMemoryManager.h"
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
+#include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/GVN.h"
+#endif
+
 namespace jittefex {
 
 Jittefex::Jittefex(

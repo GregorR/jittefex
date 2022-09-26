@@ -20,5 +20,5 @@ clean:
 
 include deps.mk
 
-deps.mk:
+deps.mk: *.cc */*.h
 	-$(CXX) $(ALLCXXFLAGS) -MM *.cc > $@
