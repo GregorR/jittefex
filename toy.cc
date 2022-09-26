@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "jittefex/jittefex.h"
+
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/BasicBlock.h"
@@ -24,7 +26,7 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
-#include "KaleidoscopeJIT.h"
+
 #include <algorithm>
 #include <cassert>
 #include <cctype>
@@ -708,7 +710,7 @@ static std::unique_ptr<PrototypeAST> ParseExtern() {
 // Code Generation
 //===----------------------------------------------------------------------===//
 
-static std::unique_ptr<KaleidoscopeJIT> TheJIT;
+static std::unique_ptr<jittefex::Jittefex> TheJIT;
 static std::unique_ptr<LLVMContext> TheContext;
 static std::unique_ptr<IRBuilder<>> Builder;
 static std::unique_ptr<Module> TheModule;
@@ -1243,7 +1245,7 @@ int main() {
   fprintf(stderr, "ready> ");
   getNextToken();
 
-  TheJIT = ExitOnErr(KaleidoscopeJIT::Create());
+  TheJIT = ExitOnErr(jittefex::Jittefex::create());
   InitializeModule();
 
   // Run the main "interpreter loop" now.

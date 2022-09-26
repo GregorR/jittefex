@@ -1,11 +1,11 @@
 CXX=clang++
 LLVM_COMPONENTS=core orcjit native
-CXXFLAGS=-O3 -g
+CXXFLAGS=-O0 -g
 ALLCXXFLAGS=`llvm-config --cxxflags` $(CXXFLAGS)
 LDFLAGS=`llvm-config --ldflags`
 LIBS=`llvm-config --system-libs --libs $(LLVM_COMPONENTS)`
 
-OBJS=toy.o
+OBJS=jittefex.o toy.o
 
 all: toy
 

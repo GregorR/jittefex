@@ -1,0 +1,6 @@
+#ifndef JITTEFEX_CONFIG_H
+#define JITTEFEX_CONFIG_H 1
+
+#define JITTEFEX_HAVE_LLVM 1
+
+#endif
