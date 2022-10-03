@@ -2,6 +2,7 @@
 #define JITTEFEX_JITTEFEX_H 1
 
 #include "config.h"
+#include "ir.h"
 
 #ifdef JITTEFEX_HAVE_LLVM
 #include "llvm/IR/DataLayout.h"
