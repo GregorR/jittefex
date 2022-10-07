@@ -848,42 +848,42 @@ jittefex::IRNode *IfExprAST::codegen() {
 
   // Create blocks for the then and else cases.  Insert the 'then' block at the
   // end of the function.
-  llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(*TheContext, "then", TheFunction);
-  llvm::BasicBlock *ElseBB = llvm::BasicBlock::Create(*TheContext, "else");
-  llvm::BasicBlock *MergeBB = llvm::BasicBlock::Create(*TheContext, "ifcont");
+  jittefex::BasicBlock *ThenBB = jittefex::BasicBlock::create(llvm::BasicBlock::Create(*TheContext, "then", TheFunction));
+  jittefex::BasicBlock *ElseBB = jittefex::BasicBlock::create(llvm::BasicBlock::Create(*TheContext, "else"));
+  jittefex::BasicBlock *MergeBB = jittefex::BasicBlock::create(llvm::BasicBlock::Create(*TheContext, "ifcont"));
 
-  Builder->CreateCondBr(CondV->getLLVMValue(), ThenBB, ElseBB);
+  Builder->CreateCondBr(CondV->getLLVMValue(), ThenBB->getLLVMBB(), ElseBB->getLLVMBB());
 
   // Emit then value.
-  Builder->SetInsertPoint(ThenBB);
+  Builder->SetInsertPoint(ThenBB->getLLVMBB());
 
   jittefex::IRNode *ThenV = Then->codegen();
   if (!ThenV)
     return nullptr;
 
-  Builder->CreateBr(MergeBB);
+  Builder->CreateBr(MergeBB->getLLVMBB());
   // Codegen of 'Then' can change the current block, update ThenBB for the PHI.
-  ThenBB = Builder->GetInsertBlock();
+  ThenBB = jittefex::BasicBlock::create(Builder->GetInsertBlock());
 
   // Emit else block.
-  TheFunction->getBasicBlockList().push_back(ElseBB);
-  Builder->SetInsertPoint(ElseBB);
+  TheFunction->getBasicBlockList().push_back(ElseBB->getLLVMBB());
+  Builder->SetInsertPoint(ElseBB->getLLVMBB());
 
   jittefex::IRNode *ElseV = Else->codegen();
   if (!ElseV)
     return nullptr;
 
-  Builder->CreateBr(MergeBB);
+  Builder->CreateBr(MergeBB->getLLVMBB());
   // Codegen of 'Else' can change the current block, update ElseBB for the PHI.
-  ElseBB = Builder->GetInsertBlock();
+  ElseBB = jittefex::BasicBlock::create(Builder->GetInsertBlock());
 
   // Emit merge block.
-  TheFunction->getBasicBlockList().push_back(MergeBB);
-  Builder->SetInsertPoint(MergeBB);
+  TheFunction->getBasicBlockList().push_back(MergeBB->getLLVMBB());
+  Builder->SetInsertPoint(MergeBB->getLLVMBB());
   llvm::PHINode *PN = Builder->CreatePHI(llvm::Type::getDoubleTy(*TheContext), 2, "iftmp");
 
-  PN->addIncoming(ThenV->getLLVMValue(), ThenBB);
-  PN->addIncoming(ElseV->getLLVMValue(), ElseBB);
+  PN->addIncoming(ThenV->getLLVMValue(), ThenBB->getLLVMBB());
+  PN->addIncoming(ElseV->getLLVMValue(), ElseBB->getLLVMBB());
   return new jittefex::IRNode(PN);
 }
 
@@ -922,13 +922,13 @@ jittefex::IRNode *ForExprAST::codegen() {
 
   // Make the new basic block for the loop header, inserting after current
   // block.
-  llvm::BasicBlock *LoopBB = llvm::BasicBlock::Create(*TheContext, "loop", TheFunction);
+  jittefex::BasicBlock *LoopBB = jittefex::BasicBlock::create(llvm::BasicBlock::Create(*TheContext, "loop", TheFunction));
 
   // Insert an explicit fall through from the current block to the LoopBB.
-  Builder->CreateBr(LoopBB);
+  Builder->CreateBr(LoopBB->getLLVMBB());
 
   // Start insertion in LoopBB.
-  Builder->SetInsertPoint(LoopBB);
+  Builder->SetInsertPoint(LoopBB->getLLVMBB());
 
   // Within the loop, the variable is defined equal to the PHI node.  If it
   // shadows an existing variable, we have to restore it, so save it now.
@@ -969,14 +969,14 @@ jittefex::IRNode *ForExprAST::codegen() {
       EndCond->getLLVMValue(), llvm::ConstantFP::get(*TheContext, llvm::APFloat(0.0)), "loopcond"));
 
   // Create the "after loop" block and insert it.
-  llvm::BasicBlock *AfterBB =
-      llvm::BasicBlock::Create(*TheContext, "afterloop", TheFunction);
+  jittefex::BasicBlock *AfterBB =
+      jittefex::BasicBlock::create(llvm::BasicBlock::Create(*TheContext, "afterloop", TheFunction));
 
   // Insert the conditional branch into the end of LoopEndBB.
-  Builder->CreateCondBr(EndCond->getLLVMValue(), LoopBB, AfterBB);
+  Builder->CreateCondBr(EndCond->getLLVMValue(), LoopBB->getLLVMBB(), AfterBB->getLLVMBB());
 
   // Any new code will be inserted in AfterBB.
-  Builder->SetInsertPoint(AfterBB);
+  Builder->SetInsertPoint(AfterBB->getLLVMBB());
 
   // Restore the unshadowed variable.
   if (OldVal)
@@ -1067,8 +1067,8 @@ llvm::Function *FunctionAST::codegen() {
     BinopPrecedence[P.getOperatorName()] = P.getBinaryPrecedence();
 
   // Create a new basic block to start insertion into.
-  llvm::BasicBlock *BB = llvm::BasicBlock::Create(*TheContext, "entry", TheFunction);
-  Builder->SetInsertPoint(BB);
+  jittefex::BasicBlock *BB = jittefex::BasicBlock::create(llvm::BasicBlock::Create(*TheContext, "entry", TheFunction));
+  Builder->SetInsertPoint(BB->getLLVMBB());
 
   // Record the function arguments in the NamedValues map.
   NamedValues.clear();

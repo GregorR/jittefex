@@ -7,6 +7,8 @@
 #include "llvm/IR/Value.h"
 #endif
 
+#include <vector>
+
 namespace jittefex {
 
 /**
@@ -29,6 +31,28 @@ class IRNode {
 #endif
 };
 
-}
+/**
+ * The IR is grouped into basic blocks.
+ */
+class BasicBlock {
+    private:
+        std::vector<IRNode *> ssa;
 
+#ifdef JITTEFEX_HAVE_LLVM
+        llvm::BasicBlock *llvmBB;
+#endif
+
+    public:
+        // Internal
+        BasicBlock(llvm::BasicBlock *llvmBB) : llvmBB{llvmBB} {}
+
+        static BasicBlock *create(llvm::BasicBlock *llvmBB);
+
+#ifdef JITTEFEX_HAVE_LLVM
+        llvm::BasicBlock *getLLVMBB() { return llvmBB; }
+#endif
+        void append(IRNode *node);
+};
+
+}
 #endif
