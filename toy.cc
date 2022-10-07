@@ -260,7 +260,7 @@ public:
       : Name(Name), Args(std::move(Args)), IsOperator(IsOperator),
         Precedence(Prec) {}
 
-  llvm::Function *codegen();
+  jittefex::Function *codegen();
   const std::string &getName() const { return Name; }
 
   bool isUnaryOp() const { return IsOperator && Args.size() == 1; }
@@ -284,7 +284,7 @@ public:
               std::unique_ptr<ExprAST> Body)
       : Proto(std::move(Proto)), Body(std::move(Body)) {}
 
-  llvm::Function *codegen();
+  jittefex::Function *codegen();
 };
 
 } // end anonymous namespace
@@ -710,10 +710,10 @@ jittefex::IRNode *LogErrorV(const char *Str) {
   return nullptr;
 }
 
-llvm::Function *getFunction(std::string Name) {
+jittefex::Function *getFunction(std::string Name) {
   // First, see if the function has already been added to the current module.
   if (auto *F = TheModule->getFunction(Name))
-    return F;
+    return jittefex::Function::create(F);
 
   // If not, check whether we can codegen the declaration from some existing
   // prototype.
@@ -727,10 +727,10 @@ llvm::Function *getFunction(std::string Name) {
 
 /// CreateEntryBlockAlloca - Create an alloca instruction in the entry block of
 /// the function.  This is used for mutable variables etc.
-static llvm::AllocaInst *CreateEntryBlockAlloca(llvm::Function *TheFunction,
+static llvm::AllocaInst *CreateEntryBlockAlloca(jittefex::Function *TheFunction,
                                           llvm::StringRef VarName) {
-  llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
-                   TheFunction->getEntryBlock().begin());
+  llvm::IRBuilder<> TmpB(&TheFunction->getLLVMFunction()->getEntryBlock(),
+                   TheFunction->getLLVMFunction()->getEntryBlock().begin());
   return TmpB.CreateAlloca(llvm::Type::getDoubleTy(*TheContext), nullptr, VarName);
 }
 
@@ -753,11 +753,11 @@ jittefex::IRNode *UnaryExprAST::codegen() {
   if (!OperandV)
     return nullptr;
 
-  llvm::Function *F = getFunction(std::string("unary") + Opcode);
+  jittefex::Function *F = getFunction(std::string("unary") + Opcode);
   if (!F)
     return LogErrorV("Unknown unary operator");
 
-  return new jittefex::IRNode(Builder->CreateCall(F, OperandV->getLLVMValue(), "unop"));
+  return new jittefex::IRNode(Builder->CreateCall(F->getLLVMFunction(), OperandV->getLLVMValue(), "unop"));
 }
 
 jittefex::IRNode *BinaryExprAST::codegen() {
@@ -808,21 +808,21 @@ jittefex::IRNode *BinaryExprAST::codegen() {
 
   // If it wasn't a builtin binary operator, it must be a user defined one. Emit
   // a call to it.
-  llvm::Function *F = getFunction(std::string("binary") + Op);
+  jittefex::Function *F = getFunction(std::string("binary") + Op);
   assert(F && "binary operator not found!");
 
   llvm::Value *Ops[] = {L->getLLVMValue(), R->getLLVMValue()};
-  return new jittefex::IRNode(Builder->CreateCall(F, Ops, "binop"));
+  return new jittefex::IRNode(Builder->CreateCall(F->getLLVMFunction(), Ops, "binop"));
 }
 
 jittefex::IRNode *CallExprAST::codegen() {
   // Look up the name in the global module table.
-  llvm::Function *CalleeF = getFunction(Callee);
+  jittefex::Function *CalleeF = getFunction(Callee);
   if (!CalleeF)
     return LogErrorV("Unknown function referenced");
 
   // If argument mismatch error.
-  if (CalleeF->arg_size() != Args.size())
+  if (CalleeF->getLLVMFunction()->arg_size() != Args.size())
     return LogErrorV("Incorrect # arguments passed");
 
   std::vector<llvm::Value *> ArgsV;
@@ -832,7 +832,7 @@ jittefex::IRNode *CallExprAST::codegen() {
       return nullptr;
   }
 
-  return new jittefex::IRNode(Builder->CreateCall(CalleeF, ArgsV, "calltmp"));
+  return new jittefex::IRNode(Builder->CreateCall(CalleeF->getLLVMFunction(), ArgsV, "calltmp"));
 }
 
 jittefex::IRNode *IfExprAST::codegen() {
@@ -844,11 +844,11 @@ jittefex::IRNode *IfExprAST::codegen() {
   CondV = new jittefex::IRNode(Builder->CreateFCmpONE(
       CondV->getLLVMValue(), llvm::ConstantFP::get(*TheContext, llvm::APFloat(0.0)), "ifcond"));
 
-  llvm::Function *TheFunction = Builder->GetInsertBlock()->getParent();
+  jittefex::Function *TheFunction = jittefex::Function::create(Builder->GetInsertBlock()->getParent());
 
   // Create blocks for the then and else cases.  Insert the 'then' block at the
   // end of the function.
-  jittefex::BasicBlock *ThenBB = jittefex::BasicBlock::create(llvm::BasicBlock::Create(*TheContext, "then", TheFunction));
+  jittefex::BasicBlock *ThenBB = jittefex::BasicBlock::create(llvm::BasicBlock::Create(*TheContext, "then", TheFunction->getLLVMFunction()));
   jittefex::BasicBlock *ElseBB = jittefex::BasicBlock::create(llvm::BasicBlock::Create(*TheContext, "else"));
   jittefex::BasicBlock *MergeBB = jittefex::BasicBlock::create(llvm::BasicBlock::Create(*TheContext, "ifcont"));
 
@@ -866,7 +866,7 @@ jittefex::IRNode *IfExprAST::codegen() {
   ThenBB = jittefex::BasicBlock::create(Builder->GetInsertBlock());
 
   // Emit else block.
-  TheFunction->getBasicBlockList().push_back(ElseBB->getLLVMBB());
+  TheFunction->getLLVMFunction()->getBasicBlockList().push_back(ElseBB->getLLVMBB());
   Builder->SetInsertPoint(ElseBB->getLLVMBB());
 
   jittefex::IRNode *ElseV = Else->codegen();
@@ -878,7 +878,7 @@ jittefex::IRNode *IfExprAST::codegen() {
   ElseBB = jittefex::BasicBlock::create(Builder->GetInsertBlock());
 
   // Emit merge block.
-  TheFunction->getBasicBlockList().push_back(MergeBB->getLLVMBB());
+  TheFunction->getLLVMFunction()->getBasicBlockList().push_back(MergeBB->getLLVMBB());
   Builder->SetInsertPoint(MergeBB->getLLVMBB());
   llvm::PHINode *PN = Builder->CreatePHI(llvm::Type::getDoubleTy(*TheContext), 2, "iftmp");
 
@@ -907,7 +907,7 @@ jittefex::IRNode *IfExprAST::codegen() {
 //   br endcond, loop, endloop
 // outloop:
 jittefex::IRNode *ForExprAST::codegen() {
-  llvm::Function *TheFunction = Builder->GetInsertBlock()->getParent();
+  jittefex::Function *TheFunction = jittefex::Function::create(Builder->GetInsertBlock()->getParent());
 
   // Create an alloca for the variable in the entry block.
   llvm::AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, VarName);
@@ -922,7 +922,7 @@ jittefex::IRNode *ForExprAST::codegen() {
 
   // Make the new basic block for the loop header, inserting after current
   // block.
-  jittefex::BasicBlock *LoopBB = jittefex::BasicBlock::create(llvm::BasicBlock::Create(*TheContext, "loop", TheFunction));
+  jittefex::BasicBlock *LoopBB = jittefex::BasicBlock::create(llvm::BasicBlock::Create(*TheContext, "loop", TheFunction->getLLVMFunction()));
 
   // Insert an explicit fall through from the current block to the LoopBB.
   Builder->CreateBr(LoopBB->getLLVMBB());
@@ -970,7 +970,7 @@ jittefex::IRNode *ForExprAST::codegen() {
 
   // Create the "after loop" block and insert it.
   jittefex::BasicBlock *AfterBB =
-      jittefex::BasicBlock::create(llvm::BasicBlock::Create(*TheContext, "afterloop", TheFunction));
+      jittefex::BasicBlock::create(llvm::BasicBlock::Create(*TheContext, "afterloop", TheFunction->getLLVMFunction()));
 
   // Insert the conditional branch into the end of LoopEndBB.
   Builder->CreateCondBr(EndCond->getLLVMValue(), LoopBB->getLLVMBB(), AfterBB->getLLVMBB());
@@ -991,7 +991,7 @@ jittefex::IRNode *ForExprAST::codegen() {
 jittefex::IRNode *VarExprAST::codegen() {
   std::vector<jittefex::IRNode *> OldBindings;
 
-  llvm::Function *TheFunction = Builder->GetInsertBlock()->getParent();
+  jittefex::Function *TheFunction = jittefex::Function::create(Builder->GetInsertBlock()->getParent());
 
   // Register all variables and emit their initializer.
   for (unsigned i = 0, e = VarNames.size(); i != e; ++i) {
@@ -1036,29 +1036,29 @@ jittefex::IRNode *VarExprAST::codegen() {
   return BodyVal;
 }
 
-llvm::Function *PrototypeAST::codegen() {
+jittefex::Function *PrototypeAST::codegen() {
   // Make the function type:  double(double,double) etc.
   std::vector<llvm::Type *> Doubles(Args.size(), llvm::Type::getDoubleTy(*TheContext));
   llvm::FunctionType *FT =
       llvm::FunctionType::get(llvm::Type::getDoubleTy(*TheContext), Doubles, false);
 
-  llvm::Function *F =
-      llvm::Function::Create(FT, llvm::Function::ExternalLinkage, Name, TheModule.get());
+  jittefex::Function *F =
+      jittefex::Function::create(llvm::Function::Create(FT, llvm::Function::ExternalLinkage, Name, TheModule.get()));
 
   // Set names for all arguments.
   unsigned Idx = 0;
-  for (auto &Arg : F->args())
+  for (auto &Arg : F->getLLVMFunction()->args())
     Arg.setName(Args[Idx++]);
 
   return F;
 }
 
-llvm::Function *FunctionAST::codegen() {
+jittefex::Function *FunctionAST::codegen() {
   // Transfer ownership of the prototype to the FunctionProtos map, but keep a
   // reference to it for use below.
   auto &P = *Proto;
   FunctionProtos[Proto->getName()] = std::move(Proto);
-  llvm::Function *TheFunction = getFunction(P.getName());
+  jittefex::Function *TheFunction = getFunction(P.getName());
   if (!TheFunction)
     return nullptr;
 
@@ -1067,12 +1067,12 @@ llvm::Function *FunctionAST::codegen() {
     BinopPrecedence[P.getOperatorName()] = P.getBinaryPrecedence();
 
   // Create a new basic block to start insertion into.
-  jittefex::BasicBlock *BB = jittefex::BasicBlock::create(llvm::BasicBlock::Create(*TheContext, "entry", TheFunction));
+  jittefex::BasicBlock *BB = jittefex::BasicBlock::create(llvm::BasicBlock::Create(*TheContext, "entry", TheFunction->getLLVMFunction()));
   Builder->SetInsertPoint(BB->getLLVMBB());
 
   // Record the function arguments in the NamedValues map.
   NamedValues.clear();
-  for (auto &Arg : TheFunction->args()) {
+  for (auto &Arg : TheFunction->getLLVMFunction()->args()) {
     // Create an alloca for this variable.
     llvm::AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, Arg.getName());
 
@@ -1088,13 +1088,13 @@ llvm::Function *FunctionAST::codegen() {
     Builder->CreateRet(RetVal->getLLVMValue());
 
     // Validate the generated code, checking for consistency.
-    verifyFunction(*TheFunction);
+    verifyFunction(*TheFunction->getLLVMFunction());
 
     return TheFunction;
   }
 
   // Error reading body, remove function.
-  TheFunction->eraseFromParent();
+  TheFunction->getLLVMFunction()->eraseFromParent();
 
   if (P.isBinaryOp())
     BinopPrecedence.erase(P.getOperatorName());
@@ -1119,7 +1119,7 @@ static void HandleDefinition() {
   if (auto FnAST = ParseDefinition()) {
     if (auto *FnIR = FnAST->codegen()) {
       fprintf(stderr, "Read function definition:");
-      FnIR->print(llvm::errs());
+      FnIR->getLLVMFunction()->print(llvm::errs());
       fprintf(stderr, "\n");
       auto TSM = llvm::orc::ThreadSafeModule(std::move(TheModule), std::move(TheContext));
       ExitOnErr(TheJIT->addModule(std::move(TSM)));
@@ -1135,7 +1135,7 @@ static void HandleExtern() {
   if (auto ProtoAST = ParseExtern()) {
     if (auto *FnIR = ProtoAST->codegen()) {
       fprintf(stderr, "Read extern: ");
-      FnIR->print(llvm::errs());
+      FnIR->getLLVMFunction()->print(llvm::errs());
       fprintf(stderr, "\n");
       FunctionProtos[ProtoAST->getName()] = std::move(ProtoAST);
     }

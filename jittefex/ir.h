@@ -54,5 +54,28 @@ class BasicBlock {
         void append(IRNode *node);
 };
 
+/**
+ * Basic blocks are grouped into functions.
+ */
+class Function {
+    private:
+        std::vector<BasicBlock *> blocks;
+
+#ifdef JITTEFEX_HAVE_LLVM
+        llvm::Function *llvmFunction;
+#endif
+
+    public:
+        // Internal
+        Function(llvm::Function *llvmFunction) : llvmFunction{llvmFunction} {}
+
+        static Function *create(llvm::Function *llvmFunction);
+
+#ifdef JITTEFEX_HAVE_LLVM
+        llvm::Function *getLLVMFunction() { return llvmFunction; }
+#endif
+        void append(BasicBlock *block);
+};
+
 }
 #endif
