@@ -2,6 +2,7 @@
 #define JITTEFEX_JITTEFEX_H 1
 
 #include "config.h"
+//#include "builder.h"
 #include "ir.h"
 
 #ifdef JITTEFEX_HAVE_LLVM
@@ -23,6 +24,9 @@ namespace jittefex {
 class Jittefex {
     private:
 #ifdef JITTEFEX_HAVE_LLVM
+        // The LLVM context
+        std::unique_ptr<llvm::LLVMContext> llvmContext;
+
         // The JIT execution session, to run our code in (LLVM)
         std::unique_ptr<llvm::orc::ExecutionSession> es;
 
@@ -63,6 +67,8 @@ class Jittefex {
         static llvm::Expected<std::unique_ptr<Jittefex>> create();
 
 #ifdef JITTEFEX_HAVE_LLVM
+        const std::unique_ptr<llvm::LLVMContext> &getLLVMContext() const { return llvmContext; }
+
         const llvm::DataLayout &getDataLayout() const { return dl; }
 
         llvm::orc::JITDylib &getMainJITDylib() { return mainJD; }

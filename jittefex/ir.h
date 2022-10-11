@@ -77,5 +77,26 @@ class Function {
         void append(BasicBlock *block);
 };
 
+/**
+ * Functions are grouped into modules.
+ */
+class Module {
+    private:
+        std::vector<Function *> functions;
+
+#ifdef JITTEFEX_HAVE_LLVM
+        std::unique_ptr<llvm::LLVMContext> llvmContext;
+        std::unique_ptr<llvm::Module> llvmModule;
+#endif
+
+    public:
+        Module(const std::string &name);
+
+#ifdef JITTEFEX_HAVE_LLVM
+        std::unique_ptr<llvm::LLVMContext> &getLLVMContext() { return llvmContext; }
+        std::unique_ptr<llvm::Module> &getLLVMModule() { return llvmModule; }
+#endif
+};
+
 }
 #endif
