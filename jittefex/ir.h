@@ -65,15 +65,22 @@ class Function {
         llvm::Function *llvmFunction;
 #endif
 
+        BasicBlock *entryBlock = nullptr;
+
     public:
         // Internal
         Function(llvm::Function *llvmFunction) : llvmFunction{llvmFunction} {}
+
+        ~Function();
 
         static Function *create(llvm::Function *llvmFunction);
 
 #ifdef JITTEFEX_HAVE_LLVM
         llvm::Function *getLLVMFunction() { return llvmFunction; }
 #endif
+
+        BasicBlock *getEntryBlock();
+
         void append(BasicBlock *block);
 };
 

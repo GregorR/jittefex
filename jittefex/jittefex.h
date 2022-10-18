@@ -2,7 +2,7 @@
 #define JITTEFEX_JITTEFEX_H 1
 
 #include "config.h"
-//#include "builder.h"
+#include "builder.h"
 #include "ir.h"
 
 #ifdef JITTEFEX_HAVE_LLVM
