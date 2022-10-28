@@ -28,7 +28,7 @@ class IRBuilder {
         IRBuilder(Module *mod, BasicBlock *insertionPoint = nullptr);
 
         BasicBlock * const getInsertBlock() { return insertionPoint; }
-        void setInsertPoint(BasicBlock *to) { insertionPoint = to; }
+        void setInsertPoint(BasicBlock *to);
 
         llvm::ReturnInst *createRet(
             llvm::Value *v

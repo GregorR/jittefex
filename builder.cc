@@ -19,6 +19,14 @@ IRBuilder::IRBuilder(Module *mod, BasicBlock *insertionPoint)
     }
 }
 
+void IRBuilder::setInsertPoint(BasicBlock *to)
+{
+    insertionPoint = to;
+#ifdef JITTEFEX_HAVE_LLVM
+    llvmBuilder->SetInsertPoint(to->getLLVMBB());
+#endif
+}
+
 // 966
 llvm::ReturnInst *IRBuilder::createRet(
     llvm::Value *v
