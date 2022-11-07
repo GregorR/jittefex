@@ -28,10 +28,11 @@ void IRBuilder::setInsertPoint(BasicBlock *to)
 }
 
 // 966
-llvm::ReturnInst *IRBuilder::createRet(
-    llvm::Value *v
+Instruction *IRBuilder::createRet(
+    Instruction *v
 ) {
-    return llvmBuilder->CreateRet(v);
+    return insertionPoint->append(
+        std::make_unique<RetInst>(insertionPoint, v));
 }
 
 // 985
@@ -42,93 +43,134 @@ llvm::BranchInst *IRBuilder::createBr(
 }
 
 // 991
-llvm::BranchInst *IRBuilder::createCondBr(
-    llvm::Value *cond, BasicBlock *ifTrue, BasicBlock *ifFalse
+Instruction *IRBuilder::createCondBr(
+    Instruction *cond, BasicBlock *ifTrue, BasicBlock *ifFalse
 ) {
-    return llvmBuilder->CreateCondBr(cond, ifTrue->getLLVMBB(), ifFalse->getLLVMBB());
+    return insertionPoint->append(
+        std::make_unique<BrInst>(insertionPoint, cond, ifTrue, ifFalse));
 }
 
 // 1423
-llvm::Value *IRBuilder::createFAdd(
-    llvm::Value *l, llvm::Value *r, const std::string &name
+Instruction *IRBuilder::createFAdd(
+    Instruction *l, Instruction *r, const std::string &name
 ) {
-    return llvmBuilder->CreateFAdd(l, r, name);
+    // FIXME
+    (void) name;
+    return insertionPoint->append(
+        std::make_unique<BinaryInst>(insertionPoint, Opcode::FAdd, l, r));
 }
 
 // 1448
-llvm::Value *IRBuilder::createFSub(
-    llvm::Value *l, llvm::Value *r, const std::string &name
+Instruction *IRBuilder::createFSub(
+    Instruction *l, Instruction *r, const std::string &name
 ) {
-    return llvmBuilder->CreateFSub(l, r, name);
+    // FIXME
+    (void) name;
+    return insertionPoint->append(
+        std::make_unique<BinaryInst>(insertionPoint, Opcode::FSub, l, r));
 }
 
 // 1473
-llvm::Value *IRBuilder::createFMul(
-    llvm::Value *l, llvm::Value *r, const std::string &name
+Instruction *IRBuilder::createFMul(
+    Instruction *l, Instruction *r, const std::string &name
 ) {
-    return llvmBuilder->CreateFMul(l, r, name);
+    // FIXME
+    (void) name;
+    return insertionPoint->append(
+        std::make_unique<BinaryInst>(insertionPoint, Opcode::FMul, l, r));
 }
 
 // 1639
-llvm::AllocaInst *IRBuilder::createAlloca(
-    llvm::Type *ty, llvm::Value *arraySize,
+Instruction *IRBuilder::createAlloca(
+    llvm::Type *ty, Instruction *arraySize,
     const std::string &name
 ) {
-    return llvmBuilder->CreateAlloca(ty, arraySize, name);
+    // FIXME
+    (void) name;
+    return insertionPoint->append(
+        std::make_unique<AllocaInst>(insertionPoint, ty, arraySize));
 }
 
 // 1656
-llvm::LoadInst *IRBuilder::createLoad(
-    llvm::Type *ty, llvm::Value *ptr, bool isVolatile,
+Instruction *IRBuilder::createLoad(
+    llvm::Type *ty, Instruction *ptr, bool isVolatile,
     const std::string &name
 ) {
-    return llvmBuilder->CreateLoad(ty, ptr, isVolatile, name);
+    // FIXME
+    (void) isVolatile;
+    (void) name;
+    return insertionPoint->append(std::make_unique<LoadInst>(insertionPoint, ty, ptr));
 }
 
 // 1695
-llvm::StoreInst *IRBuilder::createStore(
-    llvm::Value *val, llvm::Value *ptr, bool isVolatile
+Instruction *IRBuilder::createStore(
+    Instruction *val, Instruction *ptr, bool isVolatile
 ) {
-    return llvmBuilder->CreateStore(val, ptr, isVolatile);
+    // FIXME
+    (void) isVolatile;
+    return insertionPoint->append(
+        std::make_unique<StoreInst>(insertionPoint, val, ptr));
 }
 
 // 2073
-llvm::Value *IRBuilder::createUIToFP(
-    llvm::Value *val, llvm::Type *destTy, const std::string &name
+Instruction *IRBuilder::createUIToFP(
+    Instruction *val, llvm::Type *destTy, const std::string &name
 ) {
-    return llvmBuilder->CreateUIToFP(val, destTy, name);
+    // FIXME
+    (void) name;
+    return insertionPoint->append(
+        std::make_unique<UIToFPInst>(insertionPoint, val, destTy));
 }
 
 // 2292
-llvm::Value *IRBuilder::createFCmpONE(
-    llvm::Value *l, llvm::Value *r, const std::string &name
+Instruction *IRBuilder::createFCmpONE(
+    Instruction *l, Instruction *r, const std::string &name
 ) {
-    return llvmBuilder->CreateFCmpONE(l, r, name);
+    // FIXME
+    (void) name;
+    return insertionPoint->append(
+        std::make_unique<FCmpInst>(
+            insertionPoint, l, r,
+            true, true, true, false));
 }
 
 // 2322
-llvm::Value *IRBuilder::createFCmpULT(
-    llvm::Value *l, llvm::Value *r, const std::string &name
+Instruction *IRBuilder::createFCmpULT(
+    Instruction *l, Instruction *r, const std::string &name
 ) {
-    return llvmBuilder->CreateFCmpULT(l, r, name);
-}
-
-// 2383
-llvm::PHINode *IRBuilder::createPHI(
-    llvm::Type *ty, unsigned numReservedValues,
-    const std::string &name
-) {
-    return llvmBuilder->CreatePHI(ty, numReservedValues, name);
+    // FIXME
+    (void) name;
+    return insertionPoint->append(
+        std::make_unique<FCmpInst>(
+            insertionPoint, l, r,
+            false, false, true, false));
 }
 
 // 2391
-llvm::CallInst *IRBuilder::createCall(
-    llvm::FunctionType *fTy, llvm::Value *callee,
-    const std::vector<llvm::Value *> args,
+Instruction *IRBuilder::createCall(
+    llvm::FunctionType *fTy, Instruction *callee,
+    const std::vector<Instruction *> &args,
     const std::string &name
 ) {
-    return llvmBuilder->CreateCall(fTy, callee, args, name);
+    // FIXME
+    (void) name;
+    return insertionPoint->append(
+        std::make_unique<CallInst>(insertionPoint, fTy, callee, args));
+}
+
+Instruction *IRBuilder::createArg(int idx) {
+    return insertionPoint->append(
+        std::make_unique<ArgInst>(insertionPoint, idx));
+}
+
+Instruction *IRBuilder::createFltLiteral(double val) {
+    return insertionPoint->append(
+        std::make_unique<LiteralInst>(insertionPoint, val));
+}
+
+Instruction *IRBuilder::createFuncLiteral(Function *val) {
+    return insertionPoint->append(
+        std::make_unique<FuncLiteralInst>(insertionPoint, val));
 }
 
 }
-

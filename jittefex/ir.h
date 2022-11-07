@@ -2,6 +2,7 @@
 #define JITTEFEX_IR_H 1
 
 #include "config.h"
+#include "instruction.h"
 
 #ifdef JITTEFEX_HAVE_LLVM
 #include "llvm/IR/Value.h"
@@ -12,31 +13,11 @@
 namespace jittefex {
 
 /**
- * A node in the Jittefex IR, i.e., an SSA node. The Jittefex IR is an SSA
- * based strongly (nearly fully) on the LLVM IR, but with no explicit Phis.
- * With no Phi, to get Phi-like behavior, it's necessary to allocate all
- * variables.
- */
-class IRNode {
-    private:
-#ifdef JITTEFEX_HAVE_LLVM
-        llvm::Value *llvmValue;
-#endif
-
-    public:
-        IRNode(llvm::Value *llvmValue) : llvmValue{llvmValue} {}
-
-#ifdef JITTEFEX_HAVE_LLVM
-        llvm::Value *getLLVMValue() { return llvmValue; }
-#endif
-};
-
-/**
  * The IR is grouped into basic blocks.
  */
 class BasicBlock {
     private:
-        std::vector<IRNode *> ssa;
+        std::vector<std::unique_ptr<Instruction>> instructions;
 
 #ifdef JITTEFEX_HAVE_LLVM
         llvm::BasicBlock *llvmBB;
@@ -44,14 +25,15 @@ class BasicBlock {
 
     public:
         // Internal
-        BasicBlock(llvm::BasicBlock *llvmBB) : llvmBB{llvmBB} {}
+        inline BasicBlock(llvm::BasicBlock *llvmBB) : llvmBB{llvmBB} {}
 
         static BasicBlock *create(llvm::BasicBlock *llvmBB);
 
 #ifdef JITTEFEX_HAVE_LLVM
-        llvm::BasicBlock *getLLVMBB() { return llvmBB; }
+        inline llvm::BasicBlock *getLLVMBB() { return llvmBB; }
 #endif
-        void append(IRNode *node);
+
+        Instruction *append(std::unique_ptr<Instruction> instr);
 };
 
 /**
@@ -69,14 +51,14 @@ class Function {
 
     public:
         // Internal
-        Function(llvm::Function *llvmFunction) : llvmFunction{llvmFunction} {}
+        inline Function(llvm::Function *llvmFunction) : llvmFunction{llvmFunction} {}
 
         ~Function();
 
         static Function *create(llvm::Function *llvmFunction);
 
 #ifdef JITTEFEX_HAVE_LLVM
-        llvm::Function *getLLVMFunction() { return llvmFunction; }
+        inline llvm::Function *getLLVMFunction() { return llvmFunction; }
 #endif
 
         BasicBlock *getEntryBlock();
@@ -100,8 +82,8 @@ class Module {
         Module(const std::string &name);
 
 #ifdef JITTEFEX_HAVE_LLVM
-        std::unique_ptr<llvm::LLVMContext> &getLLVMContext() { return llvmContext; }
-        std::unique_ptr<llvm::Module> &getLLVMModule() { return llvmModule; }
+        inline std::unique_ptr<llvm::LLVMContext> &getLLVMContext() { return llvmContext; }
+        inline std::unique_ptr<llvm::Module> &getLLVMModule() { return llvmModule; }
 #endif
 };
 

@@ -142,7 +142,7 @@ class ExprAST {
 public:
   virtual ~ExprAST() = default;
 
-  virtual jittefex::IRNode *codegen() = 0;
+  virtual jittefex::Instruction *codegen() = 0;
 };
 
 /// NumberExprAST - Expression class for numeric literals like "1.0".
@@ -152,7 +152,7 @@ class NumberExprAST : public ExprAST {
 public:
   NumberExprAST(double Val) : Val(Val) {}
 
-  jittefex::IRNode *codegen() override;
+  jittefex::Instruction *codegen() override;
 };
 
 /// VariableExprAST - Expression class for referencing a variable, like "a".
@@ -162,7 +162,7 @@ class VariableExprAST : public ExprAST {
 public:
   VariableExprAST(const std::string &Name) : Name(Name) {}
 
-  jittefex::IRNode *codegen() override;
+  jittefex::Instruction *codegen() override;
   const std::string &getName() const { return Name; }
 };
 
@@ -175,7 +175,7 @@ public:
   UnaryExprAST(char Opcode, std::unique_ptr<ExprAST> Operand)
       : Opcode(Opcode), Operand(std::move(Operand)) {}
 
-  jittefex::IRNode *codegen() override;
+  jittefex::Instruction *codegen() override;
 };
 
 /// BinaryExprAST - Expression class for a binary operator.
@@ -188,7 +188,7 @@ public:
                 std::unique_ptr<ExprAST> RHS)
       : Op(Op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
 
-  jittefex::IRNode *codegen() override;
+  jittefex::Instruction *codegen() override;
 };
 
 /// CallExprAST - Expression class for function calls.
@@ -201,7 +201,7 @@ public:
               std::vector<std::unique_ptr<ExprAST>> Args)
       : Callee(Callee), Args(std::move(Args)) {}
 
-  jittefex::IRNode *codegen() override;
+  jittefex::Instruction *codegen() override;
 };
 
 /// IfExprAST - Expression class for if/then/else.
@@ -213,7 +213,7 @@ public:
             std::unique_ptr<ExprAST> Else)
       : Cond(std::move(Cond)), Then(std::move(Then)), Else(std::move(Else)) {}
 
-  jittefex::IRNode *codegen() override;
+  jittefex::Instruction *codegen() override;
 };
 
 /// ForExprAST - Expression class for for/in.
@@ -228,7 +228,7 @@ public:
       : VarName(VarName), Start(std::move(Start)), End(std::move(End)),
         Step(std::move(Step)), Body(std::move(Body)) {}
 
-  jittefex::IRNode *codegen() override;
+  jittefex::Instruction *codegen() override;
 };
 
 /// VarExprAST - Expression class for var/in
@@ -242,7 +242,7 @@ public:
       std::unique_ptr<ExprAST> Body)
       : VarNames(std::move(VarNames)), Body(std::move(Body)) {}
 
-  jittefex::IRNode *codegen() override;
+  jittefex::Instruction *codegen() override;
 };
 
 /// PrototypeAST - This class represents the "prototype" for a function,
@@ -700,11 +700,11 @@ static std::unique_ptr<PrototypeAST> ParseExtern() {
 static std::unique_ptr<jittefex::Jittefex> TheJIT;
 static std::unique_ptr<jittefex::IRBuilder> Builder;
 static std::unique_ptr<jittefex::Module> TheModule;
-static std::map<std::string, jittefex::IRNode *> NamedValues;
+static std::map<std::string, jittefex::Instruction *> NamedValues;
 static std::map<std::string, std::unique_ptr<PrototypeAST>> FunctionProtos;
 static llvm::ExitOnError ExitOnErr;
 
-jittefex::IRNode *LogErrorV(const char *Str) {
+jittefex::Instruction *LogErrorV(const char *Str) {
   LogError(Str);
   return nullptr;
 }
@@ -726,28 +726,28 @@ jittefex::Function *getFunction(std::string Name) {
 
 /// CreateEntryBlockAlloca - Create an alloca instruction in the entry block of
 /// the function.  This is used for mutable variables etc.
-static llvm::AllocaInst *CreateEntryBlockAlloca(jittefex::Function *TheFunction,
+static jittefex::Instruction *CreateEntryBlockAlloca(jittefex::Function *TheFunction,
                                           const std::string &VarName) {
   jittefex::IRBuilder TmpB(TheModule.get(), TheFunction->getEntryBlock());
   return TmpB.createAlloca(llvm::Type::getDoubleTy(*TheModule->getLLVMContext()), nullptr, VarName);
 }
 
-jittefex::IRNode *NumberExprAST::codegen() {
-  return new jittefex::IRNode(llvm::ConstantFP::get(*TheModule->getLLVMContext(), llvm::APFloat(Val)));
+jittefex::Instruction *NumberExprAST::codegen() {
+  return Builder->createFltLiteral(Val);
 }
 
-jittefex::IRNode *VariableExprAST::codegen() {
+jittefex::Instruction *VariableExprAST::codegen() {
   // Look this variable up in the function.
-  jittefex::IRNode *V = NamedValues[Name];
+  jittefex::Instruction *V = NamedValues[Name];
   if (!V)
     return LogErrorV("Unknown variable name");
 
   // Load the value.
-  return new jittefex::IRNode(Builder->createLoad(llvm::Type::getDoubleTy(*TheModule->getLLVMContext()), V->getLLVMValue(), false, Name.c_str()));
+  return Builder->createLoad(llvm::Type::getDoubleTy(*TheModule->getLLVMContext()), V, false, Name.c_str());
 }
 
-jittefex::IRNode *UnaryExprAST::codegen() {
-  jittefex::IRNode *OperandV = Operand->codegen();
+jittefex::Instruction *UnaryExprAST::codegen() {
+  jittefex::Instruction *OperandV = Operand->codegen();
   if (!OperandV)
     return nullptr;
 
@@ -755,12 +755,13 @@ jittefex::IRNode *UnaryExprAST::codegen() {
   if (!F)
     return LogErrorV("Unknown unary operator");
 
-  std::vector<llvm::Value *> args;
-  args.push_back(OperandV->getLLVMValue());
-  return new jittefex::IRNode(Builder->createCall(F->getLLVMFunction()->getFunctionType(), F->getLLVMFunction(), args, "unop"));
+  std::vector<jittefex::Instruction *> args;
+  args.push_back(OperandV);
+  jittefex::Instruction *FI = Builder->createFuncLiteral(F);
+  return Builder->createCall(F->getLLVMFunction()->getFunctionType(), FI, args, "unop");
 }
 
-jittefex::IRNode *BinaryExprAST::codegen() {
+jittefex::Instruction *BinaryExprAST::codegen() {
   // Special case '=' because we don't want to emit the LHS as an expression.
   if (Op == '=') {
     // Assignment requires the LHS to be an identifier.
@@ -771,36 +772,36 @@ jittefex::IRNode *BinaryExprAST::codegen() {
     if (!LHSE)
       return LogErrorV("destination of '=' must be a variable");
     // Codegen the RHS.
-    jittefex::IRNode *Val = RHS->codegen();
+    jittefex::Instruction *Val = RHS->codegen();
     if (!Val)
       return nullptr;
 
     // Look up the name.
-    jittefex::IRNode *Variable = NamedValues[LHSE->getName()];
+    jittefex::Instruction *Variable = NamedValues[LHSE->getName()];
     if (!Variable)
       return LogErrorV("Unknown variable name");
 
-    Builder->createStore(Val->getLLVMValue(), Variable->getLLVMValue());
+    Builder->createStore(Val, Variable);
     return Val;
   }
 
-  jittefex::IRNode *L = LHS->codegen();
-  jittefex::IRNode *R = RHS->codegen();
+  jittefex::Instruction *L = LHS->codegen();
+  jittefex::Instruction *R = RHS->codegen();
   if (!L || !R)
     return nullptr;
 
   switch (Op) {
   case '+':
-    return new jittefex::IRNode(Builder->createFAdd(L->getLLVMValue(), R->getLLVMValue(), "addtmp"));
+    return Builder->createFAdd(L, R, "addtmp");
   case '-':
-    return new jittefex::IRNode(Builder->createFSub(L->getLLVMValue(), R->getLLVMValue(), "subtmp"));
+    return Builder->createFSub(L, R, "subtmp");
   case '*':
-    return new jittefex::IRNode(Builder->createFMul(L->getLLVMValue(), R->getLLVMValue(), "multmp"));
+    return Builder->createFMul(L, R, "multmp");
   case '<':
   {
-    auto *Ltmp = Builder->createFCmpULT(L->getLLVMValue(), R->getLLVMValue(), "cmptmp");
+    auto *Ltmp = Builder->createFCmpULT(L, R, "cmptmp");
     // Convert bool 0/1 to double 0.0 or 1.0
-    return new jittefex::IRNode(Builder->createUIToFP(Ltmp, llvm::Type::getDoubleTy(*TheModule->getLLVMContext()), "booltmp"));
+    return Builder->createUIToFP(Ltmp, llvm::Type::getDoubleTy(*TheModule->getLLVMContext()), "booltmp");
   }
   default:
     break;
@@ -811,11 +812,12 @@ jittefex::IRNode *BinaryExprAST::codegen() {
   jittefex::Function *F = getFunction(std::string("binary") + Op);
   assert(F && "binary operator not found!");
 
-  std::vector<llvm::Value *> Ops = {L->getLLVMValue(), R->getLLVMValue()};
-  return new jittefex::IRNode(Builder->createCall(F->getLLVMFunction()->getFunctionType(), F->getLLVMFunction(), Ops, "binop"));
+  std::vector<jittefex::Instruction *> Ops = {L, R};
+  jittefex::Instruction *FI = Builder->createFuncLiteral(F);
+  return Builder->createCall(F->getLLVMFunction()->getFunctionType(), FI, Ops, "binop");
 }
 
-jittefex::IRNode *CallExprAST::codegen() {
+jittefex::Instruction *CallExprAST::codegen() {
   // Look up the name in the global module table.
   jittefex::Function *CalleeF = getFunction(Callee);
   if (!CalleeF)
@@ -825,24 +827,28 @@ jittefex::IRNode *CallExprAST::codegen() {
   if (CalleeF->getLLVMFunction()->arg_size() != Args.size())
     return LogErrorV("Incorrect # arguments passed");
 
-  std::vector<llvm::Value *> ArgsV;
+  std::vector<jittefex::Instruction *> ArgsV;
   for (unsigned i = 0, e = Args.size(); i != e; ++i) {
-    ArgsV.push_back(Args[i]->codegen()->getLLVMValue());
+    ArgsV.push_back(Args[i]->codegen());
     if (!ArgsV.back())
       return nullptr;
   }
+  jittefex::Instruction *FI = Builder->createFuncLiteral(CalleeF);
 
-  return new jittefex::IRNode(Builder->createCall(CalleeF->getLLVMFunction()->getFunctionType(), CalleeF->getLLVMFunction(), ArgsV, "calltmp"));
+  return Builder->createCall(CalleeF->getLLVMFunction()->getFunctionType(), FI, ArgsV, "calltmp");
 }
 
-jittefex::IRNode *IfExprAST::codegen() {
-  jittefex::IRNode *CondV = Cond->codegen();
+jittefex::Instruction *IfExprAST::codegen() {
+  // Allocate space for the result (this should phi out in LLVM)
+  jittefex::Instruction *Res = Builder->createAlloca(llvm::Type::getDoubleTy(*TheModule->getLLVMContext()));
+
+  jittefex::Instruction *CondV = Cond->codegen();
   if (!CondV)
     return nullptr;
 
   // Convert condition to a bool by comparing equal to 0.0.
-  CondV = new jittefex::IRNode(Builder->createFCmpONE(
-      CondV->getLLVMValue(), llvm::ConstantFP::get(*TheModule->getLLVMContext(), llvm::APFloat(0.0)), "ifcond"));
+  CondV = Builder->createFCmpONE(
+      CondV, Builder->createFltLiteral(0.0), "ifcond");
 
   jittefex::Function *TheFunction = jittefex::Function::create(Builder->getInsertBlock()->getLLVMBB()->getParent());
 
@@ -852,14 +858,15 @@ jittefex::IRNode *IfExprAST::codegen() {
   jittefex::BasicBlock *ElseBB = jittefex::BasicBlock::create(llvm::BasicBlock::Create(*TheModule->getLLVMContext(), "else"));
   jittefex::BasicBlock *MergeBB = jittefex::BasicBlock::create(llvm::BasicBlock::Create(*TheModule->getLLVMContext(), "ifcont"));
 
-  Builder->createCondBr(CondV->getLLVMValue(), ThenBB, ElseBB);
+  Builder->createCondBr(CondV, ThenBB, ElseBB);
 
   // Emit then value.
   Builder->setInsertPoint(ThenBB);
 
-  jittefex::IRNode *ThenV = Then->codegen();
+  jittefex::Instruction *ThenV = Then->codegen();
   if (!ThenV)
     return nullptr;
+  Builder->createStore(ThenV, Res);
 
   Builder->createBr(MergeBB);
   // Codegen of 'Then' can change the current block, update ThenBB for the PHI.
@@ -869,9 +876,10 @@ jittefex::IRNode *IfExprAST::codegen() {
   TheFunction->getLLVMFunction()->getBasicBlockList().push_back(ElseBB->getLLVMBB());
   Builder->setInsertPoint(ElseBB);
 
-  jittefex::IRNode *ElseV = Else->codegen();
+  jittefex::Instruction *ElseV = Else->codegen();
   if (!ElseV)
     return nullptr;
+  Builder->createStore(ElseV, Res);
 
   Builder->createBr(MergeBB);
   // Codegen of 'Else' can change the current block, update ElseBB for the PHI.
@@ -880,11 +888,17 @@ jittefex::IRNode *IfExprAST::codegen() {
   // Emit merge block.
   TheFunction->getLLVMFunction()->getBasicBlockList().push_back(MergeBB->getLLVMBB());
   Builder->setInsertPoint(MergeBB);
+
+  /* PHI no longer exists
   llvm::PHINode *PN = Builder->createPHI(llvm::Type::getDoubleTy(*TheModule->getLLVMContext()), 2, "iftmp");
 
   PN->addIncoming(ThenV->getLLVMValue(), ThenBB->getLLVMBB());
   PN->addIncoming(ElseV->getLLVMValue(), ElseBB->getLLVMBB());
-  return new jittefex::IRNode(PN);
+  return PN;
+  */
+
+  // Instead, load the value
+  return Builder->createLoad(llvm::Type::getDoubleTy(*TheModule->getLLVMContext()), Res);
 }
 
 // Output for-loop as:
@@ -906,19 +920,19 @@ jittefex::IRNode *IfExprAST::codegen() {
 //   store nextvar -> var
 //   br endcond, loop, endloop
 // outloop:
-jittefex::IRNode *ForExprAST::codegen() {
+jittefex::Instruction *ForExprAST::codegen() {
   jittefex::Function *TheFunction = jittefex::Function::create(Builder->getInsertBlock()->getLLVMBB()->getParent());
 
   // Create an alloca for the variable in the entry block.
-  llvm::AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, VarName);
+  jittefex::Instruction *Alloca = CreateEntryBlockAlloca(TheFunction, VarName);
 
   // Emit the start code first, without 'variable' in scope.
-  jittefex::IRNode *StartVal = Start->codegen();
+  jittefex::Instruction *StartVal = Start->codegen();
   if (!StartVal)
     return nullptr;
 
   // Store the value into the alloca.
-  Builder->createStore(StartVal->getLLVMValue(), Alloca);
+  Builder->createStore(StartVal, Alloca);
 
   // Make the new basic block for the loop header, inserting after current
   // block.
@@ -932,8 +946,8 @@ jittefex::IRNode *ForExprAST::codegen() {
 
   // Within the loop, the variable is defined equal to the PHI node.  If it
   // shadows an existing variable, we have to restore it, so save it now.
-  jittefex::IRNode *OldVal = NamedValues[VarName];
-  NamedValues[VarName] = new jittefex::IRNode(Alloca);
+  jittefex::Instruction *OldVal = NamedValues[VarName];
+  NamedValues[VarName] = Alloca;
 
   // Emit the body of the loop.  This, like any other expr, can change the
   // current BB.  Note that we ignore the value computed by the body, but don't
@@ -942,38 +956,38 @@ jittefex::IRNode *ForExprAST::codegen() {
     return nullptr;
 
   // Emit the step value.
-  jittefex::IRNode *StepVal = nullptr;
+  jittefex::Instruction *StepVal = nullptr;
   if (Step) {
     StepVal = Step->codegen();
     if (!StepVal)
       return nullptr;
   } else {
     // If not specified, use 1.0.
-    StepVal = new jittefex::IRNode(llvm::ConstantFP::get(*TheModule->getLLVMContext(), llvm::APFloat(1.0)));
+    StepVal = Builder->createFltLiteral(1.0);
   }
 
   // Compute the end condition.
-  jittefex::IRNode *EndCond = End->codegen();
+  jittefex::Instruction *EndCond = End->codegen();
   if (!EndCond)
     return nullptr;
 
   // Reload, increment, and restore the alloca.  This handles the case where
   // the body of the loop mutates the variable.
-  jittefex::IRNode *CurVar = new jittefex::IRNode(Builder->createLoad(llvm::Type::getDoubleTy(*TheModule->getLLVMContext()), Alloca,
-                                      VarName.c_str()));
-  jittefex::IRNode *NextVar = new jittefex::IRNode(Builder->createFAdd(CurVar->getLLVMValue(), StepVal->getLLVMValue(), "nextvar"));
-  Builder->createStore(NextVar->getLLVMValue(), Alloca);
+  jittefex::Instruction *CurVar = Builder->createLoad(llvm::Type::getDoubleTy(*TheModule->getLLVMContext()), Alloca,
+                                      VarName.c_str());
+  jittefex::Instruction *NextVar = Builder->createFAdd(CurVar, StepVal, "nextvar");
+  Builder->createStore(NextVar, Alloca);
 
   // Convert condition to a bool by comparing equal to 0.0.
-  EndCond = new jittefex::IRNode(Builder->createFCmpONE(
-      EndCond->getLLVMValue(), llvm::ConstantFP::get(*TheModule->getLLVMContext(), llvm::APFloat(0.0)), "loopcond"));
+  EndCond = Builder->createFCmpONE(
+      EndCond, Builder->createFltLiteral(0.0), "loopcond");
 
   // Create the "after loop" block and insert it.
   jittefex::BasicBlock *AfterBB =
       jittefex::BasicBlock::create(llvm::BasicBlock::Create(*TheModule->getLLVMContext(), "afterloop", TheFunction->getLLVMFunction()));
 
   // Insert the conditional branch into the end of LoopEndBB.
-  Builder->createCondBr(EndCond->getLLVMValue(), LoopBB, AfterBB);
+  Builder->createCondBr(EndCond, LoopBB, AfterBB);
 
   // Any new code will be inserted in AfterBB.
   Builder->setInsertPoint(AfterBB);
@@ -985,11 +999,11 @@ jittefex::IRNode *ForExprAST::codegen() {
     NamedValues.erase(VarName);
 
   // for expr always returns 0.0.
-  return new jittefex::IRNode(llvm::Constant::getNullValue(llvm::Type::getDoubleTy(*TheModule->getLLVMContext())));
+  return Builder->createFltLiteral(0.0);
 }
 
-jittefex::IRNode *VarExprAST::codegen() {
-  std::vector<jittefex::IRNode *> OldBindings;
+jittefex::Instruction *VarExprAST::codegen() {
+  std::vector<jittefex::Instruction *> OldBindings;
 
   jittefex::Function *TheFunction = jittefex::Function::create(Builder->getInsertBlock()->getLLVMBB()->getParent());
 
@@ -1003,28 +1017,28 @@ jittefex::IRNode *VarExprAST::codegen() {
     // like this:
     //  var a = 1 in
     //    var a = a in ...   # refers to outer 'a'.
-    jittefex::IRNode *InitVal;
+    jittefex::Instruction *InitVal;
     if (Init) {
       InitVal = Init->codegen();
       if (!InitVal)
         return nullptr;
     } else { // If not specified, use 0.0.
-      InitVal = new jittefex::IRNode(llvm::ConstantFP::get(*TheModule->getLLVMContext(), llvm::APFloat(0.0)));
+      InitVal = Builder->createFltLiteral(0.0);
     }
 
-    llvm::AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, VarName);
-    Builder->createStore(InitVal->getLLVMValue(), Alloca);
+    jittefex::Instruction *Alloca = CreateEntryBlockAlloca(TheFunction, VarName);
+    Builder->createStore(InitVal, Alloca);
 
     // Remember the old variable binding so that we can restore the binding when
     // we unrecurse.
     OldBindings.push_back(NamedValues[VarName]);
 
     // Remember this binding.
-    NamedValues[VarName] = new jittefex::IRNode(Alloca);
+    NamedValues[VarName] = Alloca;
   }
 
   // Codegen the body, now that all vars are in scope.
-  jittefex::IRNode *BodyVal = Body->codegen();
+  jittefex::Instruction *BodyVal = Body->codegen();
   if (!BodyVal)
     return nullptr;
 
@@ -1072,20 +1086,22 @@ jittefex::Function *FunctionAST::codegen() {
 
   // Record the function arguments in the NamedValues map.
   NamedValues.clear();
+  int idx = 0;
   for (auto &Arg : TheFunction->getLLVMFunction()->args()) {
     // Create an alloca for this variable.
-    llvm::AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, Arg.getName().str());
+    jittefex::Instruction *Alloca = CreateEntryBlockAlloca(TheFunction, Arg.getName().str());
+    jittefex::Instruction *JArg = Builder->createArg(idx++);
 
     // Store the initial value into the alloca.
-    Builder->createStore(&Arg, Alloca);
+    Builder->createStore(JArg, Alloca);
 
     // Add arguments to variable symbol table.
-    NamedValues[std::string(Arg.getName())] = new jittefex::IRNode(Alloca);
+    NamedValues[std::string(Arg.getName())] = Alloca;
   }
 
-  if (jittefex::IRNode *RetVal = Body->codegen()) {
+  if (jittefex::Instruction *RetVal = Body->codegen()) {
     // Finish off the function.
-    Builder->createRet(RetVal->getLLVMValue());
+    Builder->createRet(RetVal);
 
     // Validate the generated code, checking for consistency.
     verifyFunction(*TheFunction->getLLVMFunction());

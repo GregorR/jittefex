@@ -3,6 +3,7 @@
 
 #include "config.h"
 #include "builder.h"
+#include "instruction.h"
 #include "ir.h"
 
 #ifdef JITTEFEX_HAVE_LLVM
@@ -67,11 +68,12 @@ class Jittefex {
         static llvm::Expected<std::unique_ptr<Jittefex>> create();
 
 #ifdef JITTEFEX_HAVE_LLVM
-        const std::unique_ptr<llvm::LLVMContext> &getLLVMContext() const { return llvmContext; }
+        inline const std::unique_ptr<llvm::LLVMContext> &getLLVMContext() const
+            { return llvmContext; }
 
-        const llvm::DataLayout &getDataLayout() const { return dl; }
+        inline const llvm::DataLayout &getDataLayout() const { return dl; }
 
-        llvm::orc::JITDylib &getMainJITDylib() { return mainJD; }
+        inline llvm::orc::JITDylib &getMainJITDylib() { return mainJD; }
 
         llvm::Error addModule(
             llvm::orc::ThreadSafeModule tsm, llvm::orc::ResourceTrackerSP rt = nullptr

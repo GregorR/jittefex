@@ -13,8 +13,10 @@ BasicBlock *BasicBlock::create(llvm::BasicBlock *llvmBB) {
     return new BasicBlock(llvmBB);
 }
 
-void BasicBlock::append(IRNode *node) {
-    ssa.push_back(node);
+Instruction *BasicBlock::append(std::unique_ptr<Instruction> instr) {
+    Instruction *ret = instr.get();
+    instructions.push_back(std::move(instr));
+    return ret;
 }
 
 Function::~Function() {
