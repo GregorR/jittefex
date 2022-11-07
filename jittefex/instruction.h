@@ -332,6 +332,8 @@ class ArgInst : public Instruction {
             : Instruction(parent, Opcode::Arg)
             , idx{idx}
             {}
+
+        J_GETTERS(int, Idx, idx)
 };
 
 /**
