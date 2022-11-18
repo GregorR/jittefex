@@ -3,6 +3,8 @@
 
 #include "config.h"
 
+#include "type.h"
+
 #ifdef JITTEFEX_HAVE_LLVM
 #include "llvm/IR/Type.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -106,14 +108,21 @@ class BrInst : public Instruction {
 
     public:
         inline BrInst(
-            BasicBlock *parent, Instruction *condition = nullptr,
-            BasicBlock *thenBlock = nullptr,
-            BasicBlock *elseBlock = nullptr
+            BasicBlock *parent, Instruction *condition,
+            BasicBlock *thenBlock,
+            BasicBlock *elseBlock
         )
             : Instruction(parent, Opcode::Br)
             , condition{condition}
             , thenBlock{thenBlock}
             , elseBlock{elseBlock}
+            {}
+
+        inline BrInst(BasicBlock *parent, BasicBlock *target)
+            : Instruction(parent, Opcode::Br)
+            , condition{nullptr}
+            , thenBlock{target}
+            , elseBlock{nullptr}
             {}
 
         J_GETTERS(Instruction *, Condition, condition)
@@ -164,23 +173,20 @@ class BinaryInst : public Instruction {
  */
 class AllocaInst : public Instruction {
     private:
-        // FIXME: Shouldn't use LLVM type
-#ifdef JITTEFEX_HAVE_LLVM
-        llvm::Type *llvmType;
-#endif
+        Type type;
         Instruction *arraySize; // OPTIONAL
 
     public:
         inline AllocaInst(
-            BasicBlock *parent, llvm::Type *llvmType,
+            BasicBlock *parent, const Type &type,
             Instruction *arraySize = nullptr
         )
             : Instruction(parent, Opcode::Alloca)
-            , llvmType{llvmType}
+            , type{type}
             , arraySize{arraySize}
             {}
 
-        J_GETTERS(llvm::Type *, LLVMType, llvmType)
+        J_GETTERS(Type, Type, type)
         J_GETTERS(Instruction *, ArraySize, arraySize)
 };
 
@@ -189,20 +195,17 @@ class AllocaInst : public Instruction {
  */
 class LoadInst : public Instruction {
     private:
-        // FIXME: we obviously don't want this using/needing an LLVM type
-#ifdef JITTEFEX_HAVE_LLVM
-        llvm::Type *llvmType;
-#endif
+        Type type;
         Instruction *ptr;
 
     public:
-        inline LoadInst(BasicBlock *parent, llvm::Type *type, Instruction *ptr)
+        inline LoadInst(BasicBlock *parent, const Type &type, Instruction *ptr)
             : Instruction(parent, Opcode::Load)
-            , llvmType{type}
+            , type{type}
             , ptr{ptr}
             {}
 
-        J_GETTERS(llvm::Type *, LLVMType, llvmType)
+        J_GETTERS(Type, Type, type)
         J_GETTERS(Instruction *, Ptr, ptr)
 };
 
@@ -227,23 +230,22 @@ class StoreInst : public Instruction {
         J_GETTERS(Instruction *, Ptr, ptr)
 };
 
-/*
- * FIXME: We don't want this to be a separate op. Can fix this once we have
- * types.
+/**
+ * Numeric conversions of all forms.
  */
-class UIToFPInst : public UnaryInst {
+class ConvInst : public UnaryInst {
     private:
-        llvm::Type *destTy;
+        Type destTy;
 
     public:
-        inline UIToFPInst(
-            BasicBlock *parent, Instruction *val, llvm::Type *destTy
+        inline ConvInst(
+            BasicBlock *parent, Opcode opcode, Instruction *val, const Type &destTy
         )
-            : UnaryInst(parent, Opcode::UIToFP, val)
+            : UnaryInst(parent, opcode, val)
             , destTy{destTy}
             {}
 
-        J_GETTERS(llvm::Type *, DestTy, destTy)
+        J_GETTERS(Type, DestTy, destTy)
 };
 
 /**
@@ -296,25 +298,22 @@ class FCmpInst : public CmpInst {
  */
 class CallInst : public Instruction {
     private:
-        // FIXME: we obviously don't want this using/needing LLVM types
-#ifdef JITTEFEX_HAVE_LLVM
-        llvm::FunctionType *llvmFType;
-#endif
+        FunctionType *fType;
         Instruction *callee;
         std::vector<Instruction *> args;
 
     public:
         inline CallInst(
-            BasicBlock *parent, llvm::FunctionType *fTy, Instruction *callee,
+            BasicBlock *parent, FunctionType *fTy, Instruction *callee,
             const std::vector<Instruction *> &args
         )
             : Instruction(parent, Opcode::Call)
-            , llvmFType{fTy}
+            , fType{fTy}
             , callee{callee}
             , args{args}
             {}
 
-        J_GETTERS(llvm::FunctionType *, LLVMFType, llvmFType)
+        J_GETTERS(FunctionType *, FType, fType)
         J_GETTERS(Instruction *, Callee, callee)
         // FIXME: Getting a copy of the args isn't a great way to do this :)
         J_GETTERS(std::vector<Instruction *>, Args, args)

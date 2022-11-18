@@ -5,6 +5,7 @@
 #include "builder.h"
 #include "instruction.h"
 #include "ir.h"
+#include "type.h"
 
 #ifdef JITTEFEX_HAVE_LLVM
 #include "llvm/IR/DataLayout.h"

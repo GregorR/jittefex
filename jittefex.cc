@@ -5,12 +5,27 @@
 #include "llvm/ExecutionEngine/Orc/ExecutionUtils.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/Support/TargetSelect.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #endif
 
 namespace jittefex {
+
+// Used internally for global initialization
+class JittefexInit {
+    public:
+    JittefexInit() {
+#ifdef JITTEFEX_HAVE_LLVM
+        llvm::InitializeNativeTarget();
+        llvm::InitializeNativeTargetAsmPrinter();
+        llvm::InitializeNativeTargetAsmParser();
+#endif
+    }
+};
+
+static JittefexInit jittefexInit;
 
 Jittefex::Jittefex(
 #ifdef JITTEFEX_HAVE_LLVM
@@ -33,9 +48,11 @@ Jittefex::Jittefex(
     mainJD(this->es->createBareJITDylib("<jittefex>"))
 #endif
 {
+#ifdef JITTEFEX_HAVE_LLVM
     mainJD.addGenerator(cantFail(
         llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
             dl.getGlobalPrefix())));
+#endif
 }
 
 Jittefex::~Jittefex() {

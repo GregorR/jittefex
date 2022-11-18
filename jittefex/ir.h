@@ -2,68 +2,85 @@
 #define JITTEFEX_IR_H 1
 
 #include "config.h"
+
 #include "instruction.h"
+#include "type.h"
 
 #ifdef JITTEFEX_HAVE_LLVM
-#include "llvm/IR/Value.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/Module.h"
 #endif
 
+#include <map>
 #include <vector>
 
 namespace jittefex {
+
+class Jittefex;
+class Function;
+class Module;
 
 /**
  * The IR is grouped into basic blocks.
  */
 class BasicBlock {
+    protected:
+        Function *parent = nullptr;
+        friend class Function;
+
     private:
+        std::string name;
         std::vector<std::unique_ptr<Instruction>> instructions;
 
-#ifdef JITTEFEX_HAVE_LLVM
-        llvm::BasicBlock *llvmBB;
-#endif
+        // Internal
+        inline BasicBlock(const std::string &name, Function *parent)
+            : name{name}
+            , parent{parent}
+            {}
 
     public:
-        // Internal
-        inline BasicBlock(llvm::BasicBlock *llvmBB) : llvmBB{llvmBB} {}
-
-        static BasicBlock *create(llvm::BasicBlock *llvmBB);
-
-#ifdef JITTEFEX_HAVE_LLVM
-        inline llvm::BasicBlock *getLLVMBB() { return llvmBB; }
-#endif
+        static BasicBlock *create(
+            const std::string &name = "", Function *parent = nullptr
+        );
 
         Instruction *append(std::unique_ptr<Instruction> instr);
+
+        Function *getParent() { return parent; }
 };
 
 /**
  * Basic blocks are grouped into functions.
  */
 class Function {
+    protected:
+        Module *parent = nullptr;
+        friend class Module;
+
     private:
-        std::vector<BasicBlock *> blocks;
-
-#ifdef JITTEFEX_HAVE_LLVM
-        llvm::Function *llvmFunction;
-#endif
-
+        FunctionType *type;
+        std::string name;
+        std::vector<std::unique_ptr<BasicBlock>> blocks;
         BasicBlock *entryBlock = nullptr;
 
+        inline Function(FunctionType *type, std::string name)
+            : type{type}
+            , name{name}
+            {}
+
     public:
-        // Internal
-        inline Function(llvm::Function *llvmFunction) : llvmFunction{llvmFunction} {}
+        static std::unique_ptr<Function> create(
+            FunctionType *type, const std::string &name = ""
+        );
 
-        ~Function();
-
-        static Function *create(llvm::Function *llvmFunction);
-
-#ifdef JITTEFEX_HAVE_LLVM
-        inline llvm::Function *getLLVMFunction() { return llvmFunction; }
-#endif
-
+        inline const FunctionType *getFunctionType() const { return type; }
+        inline FunctionType *getFunctionType() { return type; }
+        inline unsigned int arg_size() { return type->getParamTypes().size(); }
+        const std::string &getName() const { return name; }
         BasicBlock *getEntryBlock();
 
-        void append(BasicBlock *block);
+        BasicBlock *append(std::unique_ptr<BasicBlock> block);
+
+        void eraseFromParent();
 };
 
 /**
@@ -71,20 +88,21 @@ class Function {
  */
 class Module {
     private:
-        std::vector<Function *> functions;
+        std::string name;
+        std::vector<std::unique_ptr<Function>> functions;
+        std::map<std::string, Function *> functionsByName;
 
 #ifdef JITTEFEX_HAVE_LLVM
-        std::unique_ptr<llvm::LLVMContext> llvmContext;
         std::unique_ptr<llvm::Module> llvmModule;
 #endif
 
     public:
-        Module(const std::string &name);
+        Module(const std::string &name, const Jittefex &jit);
 
-#ifdef JITTEFEX_HAVE_LLVM
-        inline std::unique_ptr<llvm::LLVMContext> &getLLVMContext() { return llvmContext; }
-        inline std::unique_ptr<llvm::Module> &getLLVMModule() { return llvmModule; }
-#endif
+        Function *append(std::unique_ptr<Function> func);
+        void eraseChild(Function *func);
+
+        Function *getFunction(const std::string &name);
 };
 
 }

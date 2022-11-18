@@ -6,25 +6,9 @@
 
 namespace jittefex {
 
-IRBuilder::IRBuilder(Module *mod, BasicBlock *insertionPoint)
-    : mod{mod}
-    , insertionPoint{insertionPoint}
-{
-    if (insertionPoint) {
-        llvmBuilder =
-            std::make_unique<llvm::IRBuilder<>>(insertionPoint->getLLVMBB());
-    } else {
-        llvmBuilder =
-            std::make_unique<llvm::IRBuilder<>>(*mod->getLLVMContext());
-    }
-}
-
 void IRBuilder::setInsertPoint(BasicBlock *to)
 {
     insertionPoint = to;
-#ifdef JITTEFEX_HAVE_LLVM
-    llvmBuilder->SetInsertPoint(to->getLLVMBB());
-#endif
 }
 
 // 966
@@ -36,10 +20,11 @@ Instruction *IRBuilder::createRet(
 }
 
 // 985
-llvm::BranchInst *IRBuilder::createBr(
+Instruction *IRBuilder::createBr(
     BasicBlock *dest
 ) {
-    return llvmBuilder->CreateBr(dest->getLLVMBB());
+    return insertionPoint->append(
+        std::make_unique<BrInst>(insertionPoint, dest));
 }
 
 // 991
@@ -82,7 +67,7 @@ Instruction *IRBuilder::createFMul(
 
 // 1639
 Instruction *IRBuilder::createAlloca(
-    llvm::Type *ty, Instruction *arraySize,
+    const Type &ty, Instruction *arraySize,
     const std::string &name
 ) {
     // FIXME
@@ -93,7 +78,7 @@ Instruction *IRBuilder::createAlloca(
 
 // 1656
 Instruction *IRBuilder::createLoad(
-    llvm::Type *ty, Instruction *ptr, bool isVolatile,
+    const Type &ty, Instruction *ptr, bool isVolatile,
     const std::string &name
 ) {
     // FIXME
@@ -114,12 +99,12 @@ Instruction *IRBuilder::createStore(
 
 // 2073
 Instruction *IRBuilder::createUIToFP(
-    Instruction *val, llvm::Type *destTy, const std::string &name
+    Instruction *val, const Type &destTy, const std::string &name
 ) {
     // FIXME
     (void) name;
     return insertionPoint->append(
-        std::make_unique<UIToFPInst>(insertionPoint, val, destTy));
+        std::make_unique<ConvInst>(insertionPoint, Opcode::UIToFP, val, destTy));
 }
 
 // 2292
@@ -148,7 +133,7 @@ Instruction *IRBuilder::createFCmpULT(
 
 // 2391
 Instruction *IRBuilder::createCall(
-    llvm::FunctionType *fTy, Instruction *callee,
+    FunctionType *fTy, Instruction *callee,
     const std::vector<Instruction *> &args,
     const std::string &name
 ) {

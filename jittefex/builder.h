@@ -17,15 +17,14 @@ namespace jittefex {
  */
 class IRBuilder {
     private:
-#ifdef JITTEFEX_HAVE_LLVM
-        std::unique_ptr<llvm::IRBuilder<>> llvmBuilder;
-#endif
-
         Module *mod;
         BasicBlock *insertionPoint;
 
     public:
-        IRBuilder(Module *mod, BasicBlock *insertionPoint = nullptr);
+        inline IRBuilder(Module *mod, BasicBlock *insertionPoint = nullptr)
+            : mod{mod}
+            , insertionPoint{insertionPoint}
+            {}
 
         inline BasicBlock * const getInsertBlock() { return insertionPoint; }
         void setInsertPoint(BasicBlock *to);
@@ -34,7 +33,7 @@ class IRBuilder {
             Instruction *v
         );
 
-        llvm::BranchInst *createBr(
+        Instruction *createBr(
             BasicBlock *dest
         );
 
@@ -55,12 +54,12 @@ class IRBuilder {
         );
 
         Instruction *createAlloca(
-            llvm::Type *ty, Instruction *arraySize = nullptr,
+            const Type &ty, Instruction *arraySize = nullptr,
             const std::string &name = ""
         );
 
         Instruction *createLoad(
-            llvm::Type *ty, Instruction *ptr, bool isVolatile = false,
+            const Type &ty, Instruction *ptr, bool isVolatile = false,
             const std::string &name = ""
         );
 
@@ -69,7 +68,7 @@ class IRBuilder {
         );
 
         Instruction *createUIToFP(
-            Instruction *val, llvm::Type *destTy, const std::string &name = ""
+            Instruction *val, const Type &destTy, const std::string &name = ""
         );
 
         Instruction *createFCmpONE(
@@ -81,7 +80,7 @@ class IRBuilder {
         );
 
         Instruction *createCall(
-            llvm::FunctionType *fTy, Instruction *callee,
+            FunctionType *fTy, Instruction *callee,
             const std::vector<Instruction *> &args = {},
             const std::string &name = ""
         );

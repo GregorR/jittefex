@@ -1,5 +1,7 @@
 #include "jittefex/ir.h"
 
+#include "jittefex/jittefex.h"
+
 #ifdef JITTEFEX_HAVE_LLVM
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
@@ -9,8 +11,15 @@
 
 namespace jittefex {
 
-BasicBlock *BasicBlock::create(llvm::BasicBlock *llvmBB) {
-    return new BasicBlock(llvmBB);
+BasicBlock *BasicBlock::create(
+    const std::string &name, Function *parent
+) {
+    BasicBlock *ret = new BasicBlock{name, parent};
+    if (parent) {
+        return parent->append(std::unique_ptr<BasicBlock>{ret});
+    } else {
+        return ret;
+    }
 }
 
 Instruction *BasicBlock::append(std::unique_ptr<Instruction> instr) {
@@ -19,27 +28,67 @@ Instruction *BasicBlock::append(std::unique_ptr<Instruction> instr) {
     return ret;
 }
 
-Function::~Function() {
-    delete entryBlock;
-}
-
-Function *Function::create(llvm::Function *llvmFunction) {
-    return new Function(llvmFunction);
+std::unique_ptr<Function> Function::create(
+    FunctionType *type, const std::string &name
+) {
+    // FIXME
+    return std::unique_ptr<Function>{new Function{type, name}};
 }
 
 BasicBlock *Function::getEntryBlock() {
     if (!entryBlock)
-        entryBlock = new BasicBlock(&llvmFunction->getEntryBlock());
+        append(std::unique_ptr<BasicBlock>{BasicBlock::create(name, this)});
     return entryBlock;
 }
 
-void Function::append(BasicBlock *block) {
-    blocks.push_back(block);
+BasicBlock *Function::append(std::unique_ptr<BasicBlock> block) {
+    BasicBlock *ret = block.get();
+    ret->parent = this;
+    blocks.push_back(std::move(block));
+    if (!entryBlock)
+        entryBlock = ret;
+    return ret;
 }
 
-Module::Module(const std::string &name)
-    : llvmContext{std::make_unique<llvm::LLVMContext>()}
-    , llvmModule{std::make_unique<llvm::Module>(name, *llvmContext)}
-{}
+void Function::eraseFromParent() {
+    // This *intentionally* crashes if there is no parent
+    parent->eraseChild(this);
+}
+
+Module::Module(const std::string &name, const Jittefex &jit)
+    : name{name}
+{
+#ifdef JITTEFEX_HAVE_LLVM
+    llvmModule = std::make_unique<llvm::Module>(name, *jit.getLLVMContext());
+    llvmModule->setDataLayout(jit.getDataLayout());
+#endif
+}
+
+Function *Module::append(std::unique_ptr<Function> func) {
+    Function *ret = func.get();
+    ret->parent = this;
+    functions.push_back(std::move(func));
+    functionsByName[ret->getName()] = ret;
+    return ret;
+}
+
+void Module::eraseChild(Function *func) {
+    functionsByName.erase(func->getName());
+    for (auto it = functions.begin();
+         it != functions.end();
+         it++) {
+        if (it->get() == func) {
+            functions.erase(it);
+            return;
+        }
+    }
+}
+
+Function *Module::getFunction(const std::string &name) {
+    auto f = functionsByName.find(name);
+    if (f != functionsByName.end())
+        return f->second;
+    return nullptr;
+}
 
 }
