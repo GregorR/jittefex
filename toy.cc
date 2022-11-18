@@ -1090,7 +1090,7 @@ jittefex::Function *FunctionAST::codegen() {
   // Record the function arguments in the NamedValues map.
   NamedValues.clear();
   int idx = 0;
-  for (auto &ArgName : Proto->getArgs()) {
+  for (auto &ArgName : P.getArgs()) {
     // Create an alloca for this variable.
     jittefex::Instruction *Alloca = CreateEntryBlockAlloca(TheFunction, ArgName);
     jittefex::Instruction *JArg = Builder->createArg(idx++);
