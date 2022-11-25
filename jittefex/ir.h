@@ -6,12 +6,6 @@
 #include "instruction.h"
 #include "type.h"
 
-#ifdef JITTEFEX_HAVE_LLVM
-#include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Module.h"
-#endif
-
 #include <map>
 #include <vector>
 
@@ -104,12 +98,6 @@ class Module {
         std::vector<std::unique_ptr<Function>> functions;
         std::map<std::string, Function *> functionsByName;
 
-#ifdef JITTEFEX_HAVE_LLVM
-        llvm::LLVMContext *llvmContext;
-        llvm::Module *llvmModule;
-        std::unique_ptr<llvm::orc::ThreadSafeModule> llvmTSM;
-#endif
-
     public:
         Module(const std::string &name, Jittefex *jit);
 
@@ -119,11 +107,6 @@ class Module {
         inline Jittefex *getParent() { return parent; }
 
         Function *getFunction(const std::string &name);
-#ifdef JITTEFEX_HAVE_LLVM
-        inline llvm::LLVMContext *getLLVMContext() { return llvmContext; }
-        inline llvm::Module *getLLVMModule() { return llvmModule; }
-        inline std::unique_ptr<llvm::orc::ThreadSafeModule> &getLLVMTSM() { return llvmTSM; }
-#endif
 };
 
 }

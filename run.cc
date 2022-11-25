@@ -3,7 +3,10 @@
 #include "jittefex/jittefex.h"
 
 #ifdef JITTEFEX_HAVE_LLVM
+#include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/Module.h"
 #endif
 
 #include <iostream>
@@ -23,15 +26,16 @@ llvm::Expected<llvm::Value *> toLLVM(
 void Function::run(void *ret, ...) {
     // FIXME: This needs to support multiple runmodes
 
-    llvm::LLVMContext *llvmContext = parent->getLLVMContext();
-    llvm::Module *llvmModule = parent->getLLVMModule();
+    // Create a module for this function
+    auto llvmContext = std::make_unique<llvm::LLVMContext>();
+    auto llvmModule = std::make_unique<llvm::Module>(name, *llvmContext);
 
     // Convert our function type to an LLVM function type
-    llvm::FunctionType *lft = type->getLLVMFunctionType(llvmContext);
+    llvm::FunctionType *lft = type->getLLVMFunctionType(llvmContext.get());
 
     // Create our LLVM function
     llvm::Function *lf = llvm::Function::Create(lft,
-        llvm::Function::ExternalLinkage, name, llvmModule);
+        llvm::Function::ExternalLinkage, name, llvmModule.get());
 
     // Keep track of all our blocks
     std::unordered_map<BasicBlock *, llvm::BasicBlock *> basicBlocks;
@@ -71,7 +75,7 @@ void Function::run(void *ret, ...) {
                 [&instrs] (Instruction *from) {
                     return instrs[from];
                 },
-                [llvmContext, lf, &basicBlocks] (BasicBlock *from) {
+                [&llvmContext, lf, &basicBlocks] (BasicBlock *from) {
                     auto it = basicBlocks.find(from);
                     if (it != basicBlocks.end())
                         return it->second;
@@ -83,7 +87,8 @@ void Function::run(void *ret, ...) {
 
     // Compile the module
     Jittefex *jit = parent->getParent();
-    exitOnErr(jit->addModule(std::move(*parent->getLLVMTSM())));
+    auto tsm = llvm::orc::ThreadSafeModule{std::move(llvmModule), std::move(llvmContext)};
+    exitOnErr(jit->addModule(std::move(tsm)));
 
     // Get the compiled function
     auto sym = exitOnErr(jit->lookup(name));

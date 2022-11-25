@@ -53,19 +53,7 @@ void Function::eraseFromParent() {
 Module::Module(const std::string &name, Jittefex *jit)
     : name{name}
     , parent{jit}
-#ifdef JITTEFEX_HAVE_LLVM
-    , llvmContext{new llvm::LLVMContext}
-    , llvmModule{new llvm::Module{name, *llvmContext}}
-    , llvmTSM{std::make_unique<llvm::orc::ThreadSafeModule>(
-        std::unique_ptr<llvm::Module>(llvmModule),
-        std::unique_ptr<llvm::LLVMContext>(llvmContext)
-    )}
-#endif
-{
-#ifdef JITTEFEX_HAVE_LLVM
-    llvmModule->setDataLayout(jit->getDataLayout());
-#endif
-}
+    {}
 
 Function *Module::append(std::unique_ptr<Function> func) {
     Function *ret = func.get();
