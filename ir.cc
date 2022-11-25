@@ -2,11 +2,6 @@
 
 #include "jittefex/jittefex.h"
 
-#ifdef JITTEFEX_HAVE_LLVM
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Module.h"
-#endif
-
 #include <string>
 
 namespace jittefex {
@@ -55,12 +50,20 @@ void Function::eraseFromParent() {
     parent->eraseChild(this);
 }
 
-Module::Module(const std::string &name, const Jittefex &jit)
+Module::Module(const std::string &name, Jittefex *jit)
     : name{name}
+    , parent{jit}
+#ifdef JITTEFEX_HAVE_LLVM
+    , llvmContext{new llvm::LLVMContext}
+    , llvmModule{new llvm::Module{name, *llvmContext}}
+    , llvmTSM{std::make_unique<llvm::orc::ThreadSafeModule>(
+        std::unique_ptr<llvm::Module>(llvmModule),
+        std::unique_ptr<llvm::LLVMContext>(llvmContext)
+    )}
+#endif
 {
 #ifdef JITTEFEX_HAVE_LLVM
-    llvmModule = std::make_unique<llvm::Module>(name, *jit.getLLVMContext());
-    llvmModule->setDataLayout(jit.getDataLayout());
+    llvmModule->setDataLayout(jit->getDataLayout());
 #endif
 }
 

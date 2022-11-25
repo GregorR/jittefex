@@ -26,9 +26,6 @@ namespace jittefex {
 class Jittefex {
     private:
 #ifdef JITTEFEX_HAVE_LLVM
-        // The LLVM context
-        std::unique_ptr<llvm::LLVMContext> llvmContext;
-
         // The JIT execution session, to run our code in (LLVM)
         std::unique_ptr<llvm::orc::ExecutionSession> es;
 
@@ -69,9 +66,6 @@ class Jittefex {
         static llvm::Expected<std::unique_ptr<Jittefex>> create();
 
 #ifdef JITTEFEX_HAVE_LLVM
-        inline const std::unique_ptr<llvm::LLVMContext> &getLLVMContext() const
-            { return llvmContext; }
-
         inline const llvm::DataLayout &getDataLayout() const { return dl; }
 
         inline llvm::orc::JITDylib &getMainJITDylib() { return mainJD; }

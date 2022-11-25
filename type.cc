@@ -4,6 +4,16 @@
 
 namespace jittefex {
 
+#ifdef JITTEFEX_HAVE_LLVM
+llvm::Type *Type::getLLVMType(llvm::LLVMContext *context) {
+    if (baseType == BaseType::Float && width == 8)
+        return llvm::Type::getDoubleTy(*context);
+
+    // FIXME
+    return nullptr;
+}
+#endif
+
 // Function types are stored in this tree to avoid duplication
 struct FunctionTypeTreeNode {
     std::map<Type, FunctionTypeTreeNode *> children;
@@ -48,5 +58,21 @@ FunctionType *FunctionType::get(
         return ret->noVarArg = new FunctionType{returnType, paramTypes, false};
     }
 }
+
+#ifdef JITTEFEX_HAVE_LLVM
+// Convert to an LLVM function type
+llvm::FunctionType *FunctionType::getLLVMFunctionType(llvm::LLVMContext *context) {
+    // Get the argument types
+    std::vector<llvm::Type *> params;
+    for (auto &paramType : paramTypes)
+        params.push_back(paramType.getLLVMType(context));
+
+    // And the return type
+    llvm::Type *ret = returnType.getLLVMType(context);
+
+    // Produce the result
+    return llvm::FunctionType::get(ret, params, false);
+}
+#endif
 
 }

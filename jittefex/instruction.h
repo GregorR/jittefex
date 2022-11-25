@@ -79,6 +79,7 @@ class Instruction {
             {}
 
         J_GETTERS(BasicBlock *, Parent, parent)
+        J_GETTERS(Opcode, Opcode, opcode)
 };
 
 /**

@@ -35,7 +35,6 @@ Jittefex::Jittefex(
 #endif
 ) :
 #ifdef JITTEFEX_HAVE_LLVM
-    llvmContext{std::make_unique<llvm::LLVMContext>()},
     es(std::move(es)),
     dl(std::move(dl)),
     mangle(*this->es, this->dl),

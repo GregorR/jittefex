@@ -3,6 +3,11 @@
 
 #include "config.h"
 
+#ifdef JITTEFEX_HAVE_LLVM
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Type.h"
+#endif
+
 #include <vector>
 
 namespace jittefex {
@@ -74,6 +79,11 @@ class Type {
                 return false;
         }
 
+#ifdef JITTEFEX_HAVE_LLVM
+        // Convert to an LLVM type
+        llvm::Type *getLLVMType(llvm::LLVMContext *context);
+#endif
+
         inline const BaseType getBaseType() { return baseType; }
         inline const short getWidth() { return width; }
 };
@@ -103,6 +113,11 @@ class FunctionType {
         static FunctionType *get(
             const Type &returnType, const std::vector<Type> &paramTypes, bool isVarArg
         );
+
+#ifdef JITTEFEX_HAVE_LLVM
+        // Convert to an LLVM function type
+        llvm::FunctionType *getLLVMFunctionType(llvm::LLVMContext *context);
+#endif
 
         const Type &getReturnType() const { return returnType; }
         Type getReturnType() { return returnType; }
