@@ -23,8 +23,13 @@ llvm::Expected<llvm::Value *> toLLVM(
     std::function<llvm::BasicBlock *(BasicBlock *)>
 );
 
+// Quick hack to give each LLVM function a unique name
+unsigned long long llvmNameCtr = 0;
+
 void Function::run(void *ret, ...) {
     // FIXME: This needs to support multiple runmodes
+
+    std::string name = this->name + std::to_string(llvmNameCtr++);
 
     // Create a module for this function
     auto llvmContext = std::make_unique<llvm::LLVMContext>();
@@ -71,6 +76,7 @@ void Function::run(void *ret, ...) {
         for (auto &instrUP : block->getInstructions()) {
             Instruction *instr = instrUP.get();
 
+            // Convert it
             instrs[instr] = exitOnErr(toLLVM(instr, builder,
                 [&instrs] (Instruction *from) {
                     return instrs[from];
@@ -115,6 +121,18 @@ llvm::Expected<llvm::Value *> toLLVM(
         {
             auto i = (RetInst *) instr;
             return builder.CreateRet(ic(i->getValue()));
+        }
+
+        case Opcode::FAdd: // 14
+        {
+            auto i = (BinaryInst *) instr;
+            return builder.CreateFAdd(ic(i->getL()), ic(i->getR()));
+        }
+
+        case Opcode::FSub: // 16
+        {
+            auto i = (BinaryInst *) instr;
+            return builder.CreateFSub(ic(i->getL()), ic(i->getR()));
         }
 
         case Opcode::FMul: // 18

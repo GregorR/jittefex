@@ -1196,6 +1196,7 @@ static void HandleTopLevelExpression() {
       double res;
       F->run(&res);
       fprintf(stderr, "Evaluated to %f\n", res);
+      InitializeModule();
     }
   } else {
     // Skip token for error recovery.
