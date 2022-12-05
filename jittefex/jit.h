@@ -2,18 +2,15 @@
 #define JITTEFEX_JITTEFEX_H 1
 
 #include "config.h"
-#include "builder.h"
-#include "instruction.h"
-#include "ir.h"
-#include "type.h"
 
 #ifdef JITTEFEX_HAVE_LLVM
-#include "llvm/IR/DataLayout.h"
+#include "llvm/ExecutionEngine/Orc/Core.h"
 #include "llvm/ExecutionEngine/Orc/IRCompileLayer.h"
 #include "llvm/ExecutionEngine/Orc/IRTransformLayer.h"
 #include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
 #include "llvm/ExecutionEngine/Orc/Mangling.h"
 #include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
+#include "llvm/IR/DataLayout.h"
 #endif
 
 #include <memory>

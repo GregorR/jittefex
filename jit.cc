@@ -1,4 +1,4 @@
-#include "jittefex/jittefex.h"
+#include "jittefex/jit.h"
 
 #ifdef JITTEFEX_HAVE_LLVM
 #include "llvm/ExecutionEngine/Orc/CompileUtils.h"

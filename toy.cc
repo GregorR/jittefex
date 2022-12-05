@@ -10,12 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "jittefex/jittefex.h"
-
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/Verifier.h"
-#include "llvm/Support/TargetSelect.h"
+#include "jittefex/instruction.h"
+#include "jittefex/builder.h"
+#include "jittefex/jit.h"
 
 #include <algorithm>
 #include <cassert>

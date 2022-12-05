@@ -1,7 +1,5 @@
 #include "jittefex/ir.h"
 
-#include "jittefex/jittefex.h"
-
 #include <string>
 
 namespace jittefex {

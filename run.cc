@@ -1,6 +1,6 @@
 #include "jittefex/ir.h"
 
-#include "jittefex/jittefex.h"
+#include "jittefex/jit.h"
 
 #ifdef JITTEFEX_HAVE_LLVM
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
