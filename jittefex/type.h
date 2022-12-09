@@ -81,7 +81,7 @@ class Type {
 
 #ifdef JITTEFEX_HAVE_LLVM
         // Convert to an LLVM type
-        llvm::Type *getLLVMType(llvm::LLVMContext *context);
+        llvm::Type *getLLVMType(llvm::LLVMContext &context) const;
 #endif
 
         inline const BaseType getBaseType() { return baseType; }
@@ -116,7 +116,9 @@ class FunctionType {
 
 #ifdef JITTEFEX_HAVE_LLVM
         // Convert to an LLVM function type
-        llvm::FunctionType *getLLVMFunctionType(llvm::LLVMContext *context);
+        llvm::FunctionType *getLLVMFunctionType(
+            llvm::LLVMContext &context
+        ) const;
 #endif
 
         const Type &getReturnType() const { return returnType; }

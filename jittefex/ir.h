@@ -6,7 +6,8 @@
 #include "instruction.h"
 #include "type.h"
 
-#include <map>
+#include <cstdarg>
+#include <unordered_map>
 #include <vector>
 
 namespace jittefex {
@@ -72,10 +73,10 @@ class Function {
         );
 
         /**
-         * Run this function. Arguments must be correct and correctly typed.
-         * @param ret  A pointer to storage space for the return. May be NULL.
+         * Compile this into a runnable function. Must be run immediately, as
+         * compiled versions can be freed.
          */
-        void run(void *ret, ...);
+        void *compile();
 
         inline const FunctionType *getFunctionType() const { return type; }
         inline FunctionType *getFunctionType() { return type; }
@@ -96,7 +97,7 @@ class Module {
         Jittefex *parent;
         std::string name;
         std::vector<std::unique_ptr<Function>> functions;
-        std::map<std::string, Function *> functionsByName;
+        std::unordered_map<std::string, Function *> functionsByName;
 
     public:
         Module(const std::string &name, Jittefex *jit);

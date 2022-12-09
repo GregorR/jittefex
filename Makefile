@@ -5,7 +5,7 @@ ALLCXXFLAGS=`llvm-config --cxxflags` $(CXXFLAGS)
 LDFLAGS=`llvm-config --ldflags`
 LIBS=`llvm-config --system-libs --libs $(LLVM_COMPONENTS)`
 
-OBJS=builder.o ir.o jit.o run.o toy.o type.o
+OBJS=builder.o compile.o ir.o jit.o toy.o type.o
 
 all: toy
 

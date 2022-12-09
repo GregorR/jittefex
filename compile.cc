@@ -1,4 +1,5 @@
 #include "jittefex/ir.h"
+#include "jittefex/compile.h"
 
 #include "jittefex/jit.h"
 
@@ -7,6 +8,8 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Verifier.h"
+#include "llvm/Support/raw_os_ostream.h"
 #endif
 
 #include <iostream>
@@ -18,7 +21,7 @@ namespace jittefex {
 static llvm::ExitOnError exitOnErr;
 
 llvm::Expected<llvm::Value *> toLLVM(
-    Instruction *, llvm::IRBuilder<> &,
+    llvm::Function *, Instruction *, llvm::IRBuilder<> &,
     std::function<llvm::Value *(Instruction *)>,
     std::function<llvm::BasicBlock *(BasicBlock *)>
 );
@@ -26,7 +29,7 @@ llvm::Expected<llvm::Value *> toLLVM(
 // Quick hack to give each LLVM function a unique name
 unsigned long long llvmNameCtr = 0;
 
-void Function::run(void *ret, ...) {
+void *Function::compile() {
     // FIXME: This needs to support multiple runmodes
 
     std::string name = this->name + std::to_string(llvmNameCtr++);
@@ -36,7 +39,7 @@ void Function::run(void *ret, ...) {
     auto llvmModule = std::make_unique<llvm::Module>(name, *llvmContext);
 
     // Convert our function type to an LLVM function type
-    llvm::FunctionType *lft = type->getLLVMFunctionType(llvmContext.get());
+    llvm::FunctionType *lft = type->getLLVMFunctionType(*llvmContext);
 
     // Create our LLVM function
     llvm::Function *lf = llvm::Function::Create(lft,
@@ -77,7 +80,7 @@ void Function::run(void *ret, ...) {
             Instruction *instr = instrUP.get();
 
             // Convert it
-            instrs[instr] = exitOnErr(toLLVM(instr, builder,
+            instrs[instr] = exitOnErr(toLLVM(lf, instr, builder,
                 [&instrs] (Instruction *from) {
                     return instrs[from];
                 },
@@ -91,6 +94,13 @@ void Function::run(void *ret, ...) {
         }
     }
 
+    // FIXME: DEBUGGING ONLY
+    llvm::raw_os_ostream roos{std::cerr};
+    llvm::verifyFunction(*lf, &roos);
+#if 0
+    lf->print(roos);
+#endif
+
     // Compile the module
     Jittefex *jit = parent->getParent();
     auto tsm = llvm::orc::ThreadSafeModule{std::move(llvmModule), std::move(llvmContext)};
@@ -99,18 +109,14 @@ void Function::run(void *ret, ...) {
     // Get the compiled function
     auto sym = exitOnErr(jit->lookup(name));
 
-    // FIXME
-    auto *fp = (double (*)()) (void *) sym.getAddress();
-    double res = fp();
-    if (ret)
-        *((double *) ret) = res;
+    return (void *) sym.getAddress();
 }
 
 /**
  * Convert this instruction into LLVM.
  */
 llvm::Expected<llvm::Value *> toLLVM(
-    Instruction *instr, llvm::IRBuilder<> &builder,
+    llvm::Function *func, Instruction *instr, llvm::IRBuilder<> &builder,
     std::function<llvm::Value *(Instruction *)> ic,
     std::function<llvm::BasicBlock *(BasicBlock *)> bbConv
 ) {
@@ -141,10 +147,99 @@ llvm::Expected<llvm::Value *> toLLVM(
             return builder.CreateFMul(ic(i->getL()), ic(i->getR()));
         }
 
+        case Opcode::Alloca: // 31
+        {
+            auto i = (AllocaInst *) instr;
+            auto *arraySize = i->getArraySize();
+            llvm::Value *lArraySize = nullptr;
+            if (arraySize)
+                lArraySize = ic(arraySize);
+            return builder.CreateAlloca(
+                i->getType().getLLVMType(context), lArraySize);
+        }
+
+        case Opcode::Load: // 32
+        {
+            auto i = (LoadInst *) instr;
+            return builder.CreateLoad(
+                i->getType().getLLVMType(context),
+                ic(i->getPtr())
+            );
+        }
+
+        case Opcode::Store: // 33
+        {
+            auto i = (StoreInst *) instr;
+            return builder.CreateStore(ic(i->getVal()), ic(i->getPtr()));
+        }
+
+        case Opcode::Call: // 56
+        {
+            auto i = (CallInst *) instr;
+
+            // First we compile the function, so call compile
+            llvm::Value *compiler = llvm::Constant::getIntegerValue(
+                llvm::PointerType::getUnqual(context),
+                llvm::APInt(
+                    sizeof(void *) * 8,
+                    (size_t) (void *) jittefex::compile
+                )
+            );
+
+            // The argument to run() is the function itself
+            llvm::FunctionType *calleeType =
+                i->getFType()->getLLVMFunctionType(context);
+            llvm::Value *callee = ic(i->getCallee());
+
+            // Compile it
+            std::vector<llvm::Type *> cParams{
+                llvm::PointerType::getUnqual(context)};
+            std::vector<llvm::Value *> cArgs{callee};
+            llvm::FunctionType *cFTy = llvm::FunctionType::get(
+                llvm::PointerType::getUnqual(context),
+                cParams, false);
+            llvm::Value *compiled = builder.CreateCall(cFTy, compiler, cArgs);
+
+            // Get the arguments
+            std::vector<llvm::Value *> args;
+            for (auto *a : i->getArgs())
+                args.push_back(ic(a));
+
+            // Call it
+            return builder.CreateCall(calleeType, compiled, args);
+        }
+
+        case Opcode::Arg: // 1101
+        {
+            auto i = (ArgInst *) instr;
+            auto idx = i->getIdx();
+            for (auto &arg : func->args()) {
+                if (idx == 0)
+                    return &arg;
+                idx--;
+            }
+            return llvm::createStringError(
+                std::make_error_code(std::errc::not_supported),
+                "Argument %d out of range", i->getIdx()
+            );
+        }
+
         case Opcode::FLiteral: // 1201
         {
             auto i = (LiteralInst *) instr;
             return llvm::ConstantFP::get(context, llvm::APFloat(i->getFltValue()));
+        }
+
+        case Opcode::FuncLiteral: // 1202
+        {
+            auto i = (FuncLiteralInst *) instr;
+            return llvm::Constant::getIntegerValue(
+                llvm::PointerType::getUnqual(context),
+                llvm::APInt(
+                    sizeof(void *) * 8,
+                    (size_t) (void *) i->getValue()
+                )
+            );
         }
 
         default:
@@ -153,6 +248,10 @@ llvm::Expected<llvm::Value *> toLLVM(
                 "Unsupported opcode %d", instr->getOpcode()
             );
     }
+}
+
+void *compile(Function *func) {
+    return func->compile();
 }
 
 }

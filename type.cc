@@ -5,9 +5,9 @@
 namespace jittefex {
 
 #ifdef JITTEFEX_HAVE_LLVM
-llvm::Type *Type::getLLVMType(llvm::LLVMContext *context) {
+llvm::Type *Type::getLLVMType(llvm::LLVMContext &context) const {
     if (baseType == BaseType::Float && width == 8)
-        return llvm::Type::getDoubleTy(*context);
+        return llvm::Type::getDoubleTy(context);
 
     // FIXME
     return nullptr;
@@ -61,7 +61,9 @@ FunctionType *FunctionType::get(
 
 #ifdef JITTEFEX_HAVE_LLVM
 // Convert to an LLVM function type
-llvm::FunctionType *FunctionType::getLLVMFunctionType(llvm::LLVMContext *context) {
+llvm::FunctionType *FunctionType::getLLVMFunctionType(
+    llvm::LLVMContext &context
+) const {
     // Get the argument types
     std::vector<llvm::Type *> params;
     for (auto &paramType : paramTypes)

@@ -1190,9 +1190,9 @@ static void HandleTopLevelExpression() {
       // Delete the anonymous expression module from the JIT.
       ExitOnErr(RT->remove());
 #endif
-      double res;
-      F->run(&res);
-      fprintf(stderr, "Evaluated to %f\n", res);
+      double (*f)();
+      f = (double(*)()) F->compile();
+      fprintf(stderr, "Evaluated to %f\n", f());
       InitializeModule();
     }
   } else {
