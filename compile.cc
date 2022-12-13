@@ -173,6 +173,80 @@ llvm::Expected<llvm::Value *> toLLVM(
             return builder.CreateStore(ic(i->getVal()), ic(i->getPtr()));
         }
 
+        case Opcode::FCmp: // 54
+        {
+            auto i = (FCmpInst *) instr;
+            bool gt = i->getGt(),
+                 lt = i->getLt(),
+                 eq = i->getEq(),
+                 ord = i->getOrdered();
+#define F(which) do { \
+    return builder.CreateFCmp ## which(ic(i->getL()), ic(i->getR())); \
+} while (0)
+            if (gt) {
+                if (lt) {
+                    if (eq) {
+                        if (ord)
+                            F(ORD);
+                        else { // always true
+                            return llvm::Constant::getIntegerValue(
+                                llvm::Type::getInt1Ty(context),
+                                llvm::APInt(1, 1)
+                            );
+                        }
+                    } else { // !=
+                        if (ord)
+                            F(ONE);
+                        else
+                            F(UNE);
+                    }
+                } else { // !lt
+                    if (eq) { // >=
+                        if (ord)
+                            F(OGE);
+                        else
+                            F(UGE);
+                    } else { // >
+                        if (ord)
+                            F(OGT);
+                        else
+                            F(UGT);
+                    }
+                }
+            } else { // !gt
+                if (lt) {
+                    if (eq) { // <=
+                        if (ord)
+                            F(OLE);
+                        else
+                            F(ULE);
+                    } else { // <
+                        if (ord)
+                            F(OLT);
+                        else
+                            F(ULT);
+                    }
+                } else { // !lt
+                    if (eq) { // ==
+                        if (ord)
+                            F(OEQ);
+                        else
+                            F(UEQ);
+                    } else { // incomparable
+                        if (ord) { // always false
+                            return llvm::Constant::getIntegerValue(
+                                llvm::Type::getInt1Ty(context),
+                                llvm::APInt(1, 0)
+                            );
+                        } else // unordered
+                            F(UNO);
+                    }
+                }
+            }
+#undef F
+            break; // unreachable
+        }
+
         case Opcode::Call: // 56
         {
             auto i = (CallInst *) instr;
