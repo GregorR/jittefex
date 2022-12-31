@@ -12,6 +12,13 @@
 #include "llvm/Support/raw_os_ostream.h"
 #endif
 
+#ifdef JITTEFEX_HAVE_SFJIT
+#include "jittefex/sfjit/sljitLir.h"
+#if !(defined SLJIT_CONFIG_UNSUPPORTED && SLJIT_CONFIG_UNSUPPORTED)
+#define JITTEFEX_USE_SFJIT 1
+#endif
+#endif
+
 #include <iostream>
 #include <system_error>
 #include <unordered_map>
@@ -31,6 +38,23 @@ unsigned long long llvmNameCtr = 0;
 
 void *Function::compile() {
     // FIXME: This needs to support multiple runmodes
+#ifdef JITTEFEX_USE_SFJIT
+    if (sljitCompiler) {
+        struct sljit_compiler *sc = (struct sljit_compiler *) sljitCompiler;
+
+        // Fill the local space alloca
+        if (!sljit_set_alloca(sc, (struct sljit_alloca *) sljitAlloca,
+            sljitStack.size() * sizeof(sljit_f64))) {
+            sljitCode = sljit_generate_code(sc);
+        }
+
+        sljit_free_compiler(sc);
+        sljitCompiler = nullptr;
+    }
+
+    if (sljitCode)
+        return sljitCode;
+#endif
 
     std::string name = this->name + std::to_string(llvmNameCtr++);
 
@@ -155,7 +179,7 @@ llvm::Expected<llvm::Value *> toLLVM(
             if (arraySize)
                 lArraySize = ic(arraySize);
             return builder.CreateAlloca(
-                i->getType().getLLVMType(context), lArraySize);
+                i->getAllocaType().getLLVMType(context), lArraySize);
         }
 
         case Opcode::Load: // 32

@@ -79,9 +79,21 @@ class Type {
                 return false;
         }
 
+        /**
+         * To compare types.
+         */
+        inline bool operator==(const Type &other) const {
+            return (baseType == other.baseType && width == other.width);
+        }
+
 #ifdef JITTEFEX_HAVE_LLVM
         // Convert to an LLVM type
         llvm::Type *getLLVMType(llvm::LLVMContext &context) const;
+#endif
+
+#ifdef JITTEFEX_HAVE_SFJIT
+	// Convert to an sljit type, if possible
+	int getSLJITType() const;
 #endif
 
         inline const BaseType getBaseType() { return baseType; }
@@ -119,6 +131,12 @@ class FunctionType {
         llvm::FunctionType *getLLVMFunctionType(
             llvm::LLVMContext &context
         ) const;
+#endif
+
+#ifdef JITTEFEX_HAVE_SFJIT
+	/* Convert to an sljit type, if possible. Actually
+         * struct sljit_compiler * -> struct sljit_marg *. */
+        void *getSLJITType(void *scvp) const;
 #endif
 
         const Type &getReturnType() const { return returnType; }

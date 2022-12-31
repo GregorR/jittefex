@@ -15,11 +15,20 @@ namespace jittefex {
 // Forward ref
 class Function;
 class BasicBlock;
+class IRBuilder;
 
 /* LLVM has the distinction of "Values" and other "Instruction"s. In Jittefex,
  * only instructions are values, so we alias the type */
 class Instruction;
 typedef Instruction Value;
+
+#ifdef JITTEFEX_HAVE_SFJIT
+/* Instructions have locations in SLJIT, so these are those locations. */
+struct SLJITLocation {
+    int32_t reg = 0;
+    ssize_t off = 0;
+};
+#endif
 
 /* The enum of all instruction types. Lifted verbatim from LLVM (albeit given a
  * different type), with the exception that constant values are also represented
@@ -69,17 +78,25 @@ enum Opcode {
  * need to use one of the subclasses to represent an actual instruction.
  */
 class Instruction {
+#ifdef JITTEFEX_HAVE_SFJIT
+    protected:
+        SLJITLocation sljitLoc;
+        friend class IRBuilder;
+#endif
+
     private:
         BasicBlock *parent;
         Opcode opcode;
+        Type type;
 
     public:
-        inline Instruction(BasicBlock *parent, Opcode opcode)
-            : parent{parent}, opcode{opcode}
+        inline Instruction(BasicBlock *parent, Opcode opcode, const Type &type)
+            : parent{parent}, opcode{opcode}, type{type}
             {}
 
         J_GETTERS(BasicBlock *, Parent, parent)
         J_GETTERS(Opcode, Opcode, opcode)
+        J_GETTERS(Type, Type, type)
 };
 
 /**
@@ -91,7 +108,7 @@ class RetInst : public Instruction {
 
     public:
         inline RetInst(BasicBlock *parent, Instruction *value)
-            : Instruction(parent, Opcode::Ret)
+            : Instruction(parent, Opcode::Ret, Type::voidType())
             , value{value}
             {}
 
@@ -113,14 +130,14 @@ class BrInst : public Instruction {
             BasicBlock *thenBlock,
             BasicBlock *elseBlock
         )
-            : Instruction(parent, Opcode::Br)
+            : Instruction(parent, Opcode::Br, Type::voidType())
             , condition{condition}
             , thenBlock{thenBlock}
             , elseBlock{elseBlock}
             {}
 
         inline BrInst(BasicBlock *parent, BasicBlock *target)
-            : Instruction(parent, Opcode::Br)
+            : Instruction(parent, Opcode::Br, Type::voidType())
             , condition{nullptr}
             , thenBlock{target}
             , elseBlock{nullptr}
@@ -140,9 +157,9 @@ class UnaryInst : public Instruction {
 
     public:
         inline UnaryInst(
-            BasicBlock *parent, Opcode opcode, Instruction *s
+            BasicBlock *parent, Opcode opcode, const Type &type, Instruction *s
         )
-            : Instruction(parent, opcode)
+            : Instruction(parent, opcode, type)
             , s{s}
             {}
 
@@ -158,9 +175,10 @@ class BinaryInst : public Instruction {
 
     public:
         inline BinaryInst(
-            BasicBlock *parent, Opcode opcode, Instruction *l, Instruction *r
+            BasicBlock *parent, Opcode opcode, const Type &type, Instruction *l,
+            Instruction *r
         )
-            : Instruction(parent, opcode)
+            : Instruction(parent, opcode, type)
             , l{l}
             , r{r}
             {}
@@ -174,7 +192,7 @@ class BinaryInst : public Instruction {
  */
 class AllocaInst : public Instruction {
     private:
-        Type type;
+        Type allocaType;
         Instruction *arraySize; // OPTIONAL
 
     public:
@@ -182,12 +200,12 @@ class AllocaInst : public Instruction {
             BasicBlock *parent, const Type &type,
             Instruction *arraySize = nullptr
         )
-            : Instruction(parent, Opcode::Alloca)
-            , type{type}
+            : Instruction(parent, Opcode::Alloca, Type::pointerType())
+            , allocaType{type}
             , arraySize{arraySize}
             {}
 
-        J_GETTERS(Type, Type, type)
+        J_GETTERS(Type, AllocaType, allocaType)
         J_GETTERS(Instruction *, ArraySize, arraySize)
 };
 
@@ -196,17 +214,14 @@ class AllocaInst : public Instruction {
  */
 class LoadInst : public Instruction {
     private:
-        Type type;
         Instruction *ptr;
 
     public:
         inline LoadInst(BasicBlock *parent, const Type &type, Instruction *ptr)
-            : Instruction(parent, Opcode::Load)
-            , type{type}
+            : Instruction(parent, Opcode::Load, type)
             , ptr{ptr}
             {}
 
-        J_GETTERS(Type, Type, type)
         J_GETTERS(Instruction *, Ptr, ptr)
 };
 
@@ -222,7 +237,7 @@ class StoreInst : public Instruction {
         inline StoreInst(
             BasicBlock *parent, Instruction *val, Instruction *ptr
         )
-            : Instruction(parent, Opcode::Store)
+            : Instruction(parent, Opcode::Store, Type::voidType())
             , val{val}
             , ptr{ptr}
             {}
@@ -235,18 +250,13 @@ class StoreInst : public Instruction {
  * Numeric conversions of all forms.
  */
 class ConvInst : public UnaryInst {
-    private:
-        Type destTy;
-
     public:
         inline ConvInst(
-            BasicBlock *parent, Opcode opcode, Instruction *val, const Type &destTy
+            BasicBlock *parent, Opcode opcode, Instruction *val,
+            const Type &destTy
         )
-            : UnaryInst(parent, opcode, val)
-            , destTy{destTy}
+            : UnaryInst(parent, opcode, destTy, val)
             {}
-
-        J_GETTERS(Type, DestTy, destTy)
 };
 
 /**
@@ -262,7 +272,7 @@ class CmpInst : public BinaryInst {
             BasicBlock *parent, Opcode opcode, Instruction *l, Instruction *r,
             bool gt, bool lt, bool eq
         )
-            : BinaryInst(parent, opcode, l, r)
+            : BinaryInst(parent, opcode, Type::signedType(1), l, r)
             , gt{gt}
             , lt{lt}
             , eq{eq}
@@ -308,7 +318,7 @@ class CallInst : public Instruction {
             BasicBlock *parent, FunctionType *fTy, Instruction *callee,
             const std::vector<Instruction *> &args
         )
-            : Instruction(parent, Opcode::Call)
+            : Instruction(parent, Opcode::Call, fTy->getReturnType())
             , fType{fTy}
             , callee{callee}
             , args{args}
@@ -328,8 +338,8 @@ class ArgInst : public Instruction {
         int idx;
 
     public:
-        inline ArgInst(BasicBlock *parent, int idx)
-            : Instruction(parent, Opcode::Arg)
+        inline ArgInst(BasicBlock *parent, const Type &type, int idx)
+            : Instruction(parent, Opcode::Arg, type)
             , idx{idx}
             {}
 
@@ -348,8 +358,10 @@ class LiteralInst : public Instruction {
         };
 
     public:
-        inline LiteralInst(BasicBlock *parent, double fltValue)
-            : Instruction(parent, Opcode::FLiteral /* FIXME */)
+        inline LiteralInst(
+            BasicBlock *parent, const Type &type, double fltValue
+        )
+            : Instruction(parent, Opcode::FLiteral, type)
             , fltValue{fltValue}
             {}
 
@@ -367,7 +379,7 @@ class FuncLiteralInst : public Instruction {
 
     public:
         inline FuncLiteralInst(BasicBlock *parent, Function *value)
-            : Instruction(parent, Opcode::FuncLiteral)
+            : Instruction(parent, Opcode::FuncLiteral, Type::pointerType())
             , value{value}
             {}
 

@@ -2,5 +2,6 @@
 #define JITTEFEX_CONFIG_H 1
 
 #define JITTEFEX_HAVE_LLVM 1
+#define JITTEFEX_HAVE_SFJIT 1
 
 #endif

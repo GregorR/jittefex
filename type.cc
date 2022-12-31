@@ -1,5 +1,9 @@
 #include "jittefex/type.h"
 
+#ifdef JITTEFEX_HAVE_SFJIT
+#include "jittefex/sfjit/sljitLir.h"
+#endif
+
 #include <map>
 
 namespace jittefex {
@@ -11,6 +15,16 @@ llvm::Type *Type::getLLVMType(llvm::LLVMContext &context) const {
 
     // FIXME
     return nullptr;
+}
+#endif
+
+#ifdef JITTEFEX_HAVE_SFJIT
+int Type::getSLJITType() const {
+    if (baseType == BaseType::Float && width == 8)
+        return SLJIT_ARG_TYPE_F64;
+
+    // FIXME
+    return -1;
 }
 #endif
 
@@ -74,6 +88,34 @@ llvm::FunctionType *FunctionType::getLLVMFunctionType(
 
     // Produce the result
     return llvm::FunctionType::get(ret, params, false);
+}
+#endif
+
+#ifdef JITTEFEX_HAVE_SFJIT
+void *FunctionType::getSLJITType(void *scvp) const {
+    struct sljit_compiler *sc = (struct sljit_compiler *) scvp;
+    struct sljit_marg *ret;
+    int stype;
+
+    // Start with the return type
+    stype = returnType.getSLJITType();
+    if (stype < 0)
+        return NULL;
+    ret = sljit_marg_arg(sc, NULL, stype);
+    if (!ret)
+        return NULL;
+
+    // Then the arg types
+    for (auto &type : paramTypes) {
+        stype = type.getSLJITType();
+        if (stype < 0)
+            return NULL;
+        ret = sljit_marg_arg(sc, ret, stype);
+        if (!ret)
+            return NULL;
+    }
+
+    return ret;
 }
 #endif
 

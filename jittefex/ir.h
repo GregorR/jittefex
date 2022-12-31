@@ -7,6 +7,7 @@
 #include "type.h"
 
 #include <cstdarg>
+#include <queue>
 #include <unordered_map>
 #include <vector>
 
@@ -15,6 +16,7 @@ namespace jittefex {
 class Jittefex;
 class Function;
 class Module;
+class IRBuilder;
 
 /**
  * The IR is grouped into basic blocks.
@@ -23,6 +25,12 @@ class BasicBlock {
     protected:
         Function *parent = nullptr;
         friend class Function;
+
+#ifdef JITTEFEX_HAVE_SFJIT
+        void *sljitLabel = NULL; // Label for this basic block
+        std::queue<void *> sljitLabelReqs; // Things needing this label
+        friend class IRBuilder;
+#endif
 
     private:
         std::string name;
@@ -56,6 +64,42 @@ class Function {
         Module *parent = nullptr;
         friend class Module;
 
+#ifdef JITTEFEX_HAVE_SFJIT
+        void *sljitCompiler = nullptr; // actually struct sljit_compiler *
+        void *sljitCode = nullptr;
+        void *sljitAlloca = nullptr; // actually struct sljit_alloca *
+        bool sljitInit = false;
+
+        // Where the arguments are stored
+        std::vector<SLJITLocation> sljitArgLocs;
+
+        // Which registers are in use (true) or available (false)
+        std::vector<bool> sljitRegs;
+
+        // Float registers
+        std::vector<bool> sljitFRegs;
+
+        // Stack memory, in terms of negative offsets from FRAMEP
+        std::vector<bool> sljitStack;
+
+        /**
+         * Allocate a register (or any other space).
+         */
+        bool sljitAllocateRegister(bool flt, SLJITLocation &loc);
+
+        /**
+         * Allocate specifically stack space.
+         */
+        bool sljitAllocateStack(SLJITLocation &loc);
+
+        /**
+         * Release a register or stack space.
+         */
+        void sljitReleaseRegister(bool flt, const SLJITLocation &loc);
+
+        friend class IRBuilder;
+#endif
+
     private:
         FunctionType *type;
         std::string name;
@@ -77,6 +121,14 @@ class Function {
          * compiled versions can be freed.
          */
         void *compile();
+
+#ifdef JITTEFEX_HAVE_SFJIT
+        /**
+         * Immediately cancel SLJIT compilation. Mostly internal, but usable
+         * publicly as well.
+         */
+        void cancelSLJIT();
+#endif
 
         inline const FunctionType *getFunctionType() const { return type; }
         inline FunctionType *getFunctionType() { return type; }
