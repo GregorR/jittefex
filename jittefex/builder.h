@@ -29,6 +29,21 @@ class IRBuilder {
         inline BasicBlock * const getInsertBlock() { return insertionPoint; }
         void setInsertPoint(BasicBlock *to);
 
+        inline void release(Instruction *inst) {
+#ifdef JITTEFEX_HAVE_SFJIT
+            if (inst->sljitLoc.reg < 0) {
+                // This has already been released, or never had a value
+                return;
+            }
+
+            bool flt = inst->getType().getBaseType() == BaseType::Float;
+            inst->parent->parent->sljitReleaseRegister(flt, inst->sljitLoc);
+            inst->sljitLoc = SLJITLocation{-1, -1};
+#else
+            (void) inst;
+#endif
+        }
+
         Instruction *createRet(
             Instruction *v
         );

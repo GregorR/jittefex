@@ -31,8 +31,8 @@ typedef Instruction Value;
 #ifdef JITTEFEX_HAVE_SFJIT
 /* Instructions have locations in SLJIT, so these are those locations. */
 struct SLJITLocation {
-    int32_t reg = 0;
-    ptrdiff_t off = 0;
+    int32_t reg = -1;
+    ptrdiff_t off = -1;
 };
 #endif
 

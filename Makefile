@@ -1,6 +1,6 @@
 CXX=clang++
 LLVM_COMPONENTS=core orcjit native
-CXXFLAGS=-std=c++17 -O0 -g
+CXXFLAGS=-std=c++17 -O0 -g -DDEBUG
 
 # With LLVM:
 ALLCXXFLAGS=`llvm-config --cxxflags` $(CXXFLAGS)

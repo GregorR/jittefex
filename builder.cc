@@ -15,6 +15,10 @@
 
 #include <cassert>
 
+#ifdef DEBUG
+#include <iostream>
+#endif
+
 #define SJ \
     Function *f = insertionPoint->parent; \
     struct sljit_compiler *sc = (struct sljit_compiler *) f->sljitCompiler; \
@@ -29,6 +33,25 @@ namespace jittefex {
 void IRBuilder::setInsertPoint(BasicBlock *to)
 {
 #ifdef JITTEFEX_USE_SFJIT
+#ifdef DEBUG
+    if (insertionPoint) {
+        /* Make sure that all instructions in the current block have been
+         * released */
+        for (auto &inst : insertionPoint->getInstructions()) {
+            if (inst->getOpcode() == Opcode::Alloca) {
+                // Allocas don't need to be released
+                continue;
+            }
+            if (inst->sljitLoc.reg >= 0) {
+                std::cerr << "Instruction of type " <<
+                    inst->getOpcode() <<
+                    " unreleased!" << std::endl;
+                abort();
+            }
+        }
+    }
+#endif
+
     Function *f = to->parent;
     if (f->sljitCompiler) {
         struct sljit_compiler *sc = (struct sljit_compiler *)

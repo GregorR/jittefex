@@ -756,7 +756,10 @@ jittefex::Instruction *UnaryExprAST::codegen() {
   std::vector<jittefex::Instruction *> args;
   args.push_back(OperandV);
   jittefex::Instruction *FI = Builder->createFuncLiteral(F);
-  return Builder->createCall(F->getFunctionType(), FI, args, "unop");
+  jittefex::Instruction *ret = Builder->createCall(F->getFunctionType(), FI, args, "unop");
+  Builder->release(OperandV);
+  Builder->release(FI);
+  return ret;
 }
 
 jittefex::Instruction *BinaryExprAST::codegen() {
@@ -788,21 +791,32 @@ jittefex::Instruction *BinaryExprAST::codegen() {
   if (!L || !R)
     return nullptr;
 
+  jittefex::Instruction *ret = nullptr;
   switch (Op) {
   case '+':
-    return Builder->createFAdd(L, R, "addtmp");
+    ret = Builder->createFAdd(L, R, "addtmp");
+    break;
   case '-':
-    return Builder->createFSub(L, R, "subtmp");
+    ret = Builder->createFSub(L, R, "subtmp");
+    break;
   case '*':
-    return Builder->createFMul(L, R, "multmp");
+    ret = Builder->createFMul(L, R, "multmp");
+    break;
   case '<':
   {
     auto *Ltmp = Builder->createFCmpULT(L, R, "cmptmp");
     // Convert bool 0/1 to double 0.0 or 1.0
-    return Builder->createUIToFP(Ltmp, jittefex::Type::floatType(8), "booltmp");
+    ret = Builder->createUIToFP(Ltmp, jittefex::Type::floatType(8), "booltmp");
+    break;
   }
   default:
     break;
+  }
+
+  if (ret) {
+    Builder->release(L);
+    Builder->release(R);
+    return ret;
   }
 
   // If it wasn't a builtin binary operator, it must be a user defined one. Emit
@@ -812,7 +826,11 @@ jittefex::Instruction *BinaryExprAST::codegen() {
 
   std::vector<jittefex::Instruction *> Ops = {L, R};
   jittefex::Instruction *FI = Builder->createFuncLiteral(F);
-  return Builder->createCall(F->getFunctionType(), FI, Ops, "binop");
+  ret = Builder->createCall(F->getFunctionType(), FI, Ops, "binop");
+  Builder->release(L);
+  Builder->release(R);
+  Builder->release(FI);
+  return ret;
 }
 
 jittefex::Instruction *CallExprAST::codegen() {
@@ -833,7 +851,11 @@ jittefex::Instruction *CallExprAST::codegen() {
   }
   jittefex::Instruction *FI = Builder->createFuncLiteral(CalleeF);
 
-  return Builder->createCall(CalleeF->getFunctionType(), FI, ArgsV, "calltmp");
+  jittefex::Instruction *ret = Builder->createCall(CalleeF->getFunctionType(), FI, ArgsV, "calltmp");
+  for (auto *arg : ArgsV)
+    Builder->release(arg);
+  Builder->release(FI);
+  return ret;
 }
 
 jittefex::Instruction *IfExprAST::codegen() {
@@ -845,8 +867,10 @@ jittefex::Instruction *IfExprAST::codegen() {
     return nullptr;
 
   // Convert condition to a bool by comparing equal to 0.0.
+  auto *zero = Builder->createFltLiteral(0.0);
   CondV = Builder->createFCmpONE(
-      CondV, Builder->createFltLiteral(0.0), "ifcond");
+      CondV, zero, "ifcond");
+  Builder->release(zero);
 
   jittefex::Function *TheFunction = Builder->getInsertBlock()->getParent();
 
@@ -857,6 +881,7 @@ jittefex::Instruction *IfExprAST::codegen() {
   jittefex::BasicBlock *MergeBB = jittefex::BasicBlock::create("ifcont");
 
   Builder->createCondBr(CondV, ThenBB, ElseBB);
+  Builder->release(CondV);
 
   // Emit then value.
   Builder->setInsertPoint(ThenBB);
@@ -865,6 +890,7 @@ jittefex::Instruction *IfExprAST::codegen() {
   if (!ThenV)
     return nullptr;
   Builder->createStore(ThenV, Res);
+  Builder->release(ThenV);
 
   Builder->createBr(MergeBB);
   // Codegen of 'Then' can change the current block, update ThenBB for the PHI.
@@ -878,6 +904,7 @@ jittefex::Instruction *IfExprAST::codegen() {
   if (!ElseV)
     return nullptr;
   Builder->createStore(ElseV, Res);
+  Builder->release(ElseV);
 
   Builder->createBr(MergeBB);
   // Codegen of 'Else' can change the current block, update ElseBB for the PHI.
@@ -931,6 +958,7 @@ jittefex::Instruction *ForExprAST::codegen() {
 
   // Store the value into the alloca.
   Builder->createStore(StartVal, Alloca);
+  Builder->release(StartVal);
 
   // Make the new basic block for the loop header, inserting after current
   // block.
@@ -974,11 +1002,16 @@ jittefex::Instruction *ForExprAST::codegen() {
   jittefex::Instruction *CurVar = Builder->createLoad(jittefex::Type::floatType(8), Alloca,
                                       VarName.c_str());
   jittefex::Instruction *NextVar = Builder->createFAdd(CurVar, StepVal, "nextvar");
+  Builder->release(CurVar);
+  Builder->release(StepVal);
   Builder->createStore(NextVar, Alloca);
+  Builder->release(NextVar);
 
   // Convert condition to a bool by comparing equal to 0.0.
+  auto *zero = Builder->createFltLiteral(0.0);
   EndCond = Builder->createFCmpONE(
-      EndCond, Builder->createFltLiteral(0.0), "loopcond");
+      EndCond, zero, "loopcond");
+  Builder->release(zero);
 
   // Create the "after loop" block and insert it.
   jittefex::BasicBlock *AfterBB =
@@ -986,6 +1019,7 @@ jittefex::Instruction *ForExprAST::codegen() {
 
   // Insert the conditional branch into the end of LoopEndBB.
   Builder->createCondBr(EndCond, LoopBB, AfterBB);
+  Builder->release(EndCond);
 
   // Any new code will be inserted in AfterBB.
   Builder->setInsertPoint(AfterBB);
@@ -1026,6 +1060,7 @@ jittefex::Instruction *VarExprAST::codegen() {
 
     jittefex::Instruction *Alloca = CreateEntryBlockAlloca(TheFunction, VarName);
     Builder->createStore(InitVal, Alloca);
+    Builder->release(InitVal);
 
     // Remember the old variable binding so that we can restore the binding when
     // we unrecurse.
@@ -1094,6 +1129,7 @@ jittefex::Function *FunctionAST::codegen() {
 
     // Store the initial value into the alloca.
     Builder->createStore(JArg, Alloca);
+    Builder->release(JArg);
 
     // Add arguments to variable symbol table.
     NamedValues[ArgName] = Alloca;
@@ -1102,6 +1138,7 @@ jittefex::Function *FunctionAST::codegen() {
   if (jittefex::Instruction *RetVal = Body->codegen()) {
     // Finish off the function.
     Builder->createRet(RetVal);
+    Builder->release(RetVal);
 
     // Validate the generated code, checking for consistency.
     // FIXME
