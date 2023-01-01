@@ -1,7 +1,7 @@
 #ifndef JITTEFEX_RUN_H
 #define JITTEFEX_RUN_H 1
 
-#include "config.h"
+#include "jittefex/config.h"
 
 #include <cstdarg>
 

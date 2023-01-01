@@ -1,7 +1,7 @@
 #ifndef JITTEFEX_TYPE_H
 #define JITTEFEX_TYPE_H 1
 
-#include "config.h"
+#include "jittefex/config.h"
 
 #ifdef JITTEFEX_HAVE_LLVM
 #include "llvm/IR/DerivedTypes.h"

@@ -1,7 +1,7 @@
 #ifndef JITTEFEX_JITTEFEX_H
 #define JITTEFEX_JITTEFEX_H 1
 
-#include "config.h"
+#include "jittefex/config.h"
 
 #ifdef JITTEFEX_HAVE_LLVM
 #include "llvm/ExecutionEngine/Orc/Core.h"

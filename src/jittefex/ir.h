@@ -1,7 +1,7 @@
 #ifndef JITTEFEX_IR_H
 #define JITTEFEX_IR_H 1
 
-#include "config.h"
+#include "jittefex/config.h"
 
 #include "instruction.h"
 #include "type.h"
