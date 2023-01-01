@@ -25,11 +25,11 @@ class BasicBlock {
     protected:
         Function *parent = nullptr;
         friend class Function;
+        friend class IRBuilder;
 
 #ifdef JITTEFEX_HAVE_SFJIT
         void *sljitLabel = NULL; // Label for this basic block
         std::queue<void *> sljitLabelReqs; // Things needing this label
-        friend class IRBuilder;
 #endif
 
     private:
