@@ -7,7 +7,7 @@
 #endif
 
 #ifdef JITTEFEX_HAVE_SFJIT
-#include "jittefex/sfjit/sljitLir.h"
+#include "sfjit/sljitLir.h"
 #if !(defined SLJIT_CONFIG_UNSUPPORTED && SLJIT_CONFIG_UNSUPPORTED)
 #define JITTEFEX_USE_SFJIT 1
 #endif

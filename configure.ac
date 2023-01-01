@@ -67,7 +67,7 @@ AS_IF([test x"$with_sfjit" != xno], [
     CFLAGS="$CFLAGS -I${srcdir}"
     AC_COMPILE_IFELSE(
         [AC_LANG_PROGRAM([[
-#include "src/jittefex/sfjit/sljitLir.h"
+#include "src/sfjit/sljitLir.h"
 #if (defined SLJIT_CONFIG_UNSUPPORTED && SLJIT_CONFIG_UNSUPPORTED)
 #error 1
 #endif

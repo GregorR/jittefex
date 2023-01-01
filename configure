@@ -5034,7 +5034,7 @@ then :
     cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
-#include "src/jittefex/sfjit/sljitLir.h"
+#include "src/sfjit/sljitLir.h"
 #if (defined SLJIT_CONFIG_UNSUPPORTED && SLJIT_CONFIG_UNSUPPORTED)
 #error 1
 #endif

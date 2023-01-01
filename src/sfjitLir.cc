@@ -2,6 +2,6 @@
 
 #ifdef JITTEFEX_HAVE_SFJIT
 extern "C" {
-#include "jittefex/sfjit/sljitLir.c"
+#include "sfjit/sljitLir.c"
 }
 #endif

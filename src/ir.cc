@@ -1,7 +1,7 @@
 #include "jittefex/ir.h"
 
 #ifdef JITTEFEX_HAVE_SFJIT
-#include "jittefex/sfjit/sljitLir.h"
+#include "sfjit/sljitLir.h"
 #endif
 
 #if defined(JITTEFEX_HAVE_SFJIT) && \

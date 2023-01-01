@@ -1,7 +1,7 @@
 #include "jittefex/type.h"
 
 #ifdef JITTEFEX_HAVE_SFJIT
-#include "jittefex/sfjit/sljitLir.h"
+#include "sfjit/sljitLir.h"
 #endif
 
 #include <map>
