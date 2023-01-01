@@ -12,8 +12,8 @@ m4_include([scripts/lean.m4])
 AM_INIT_AUTOMAKE
 
 # Checks for programs.
-AC_PROG_CC
-AC_PROG_CXX
+AC_PROG_CC([clang gcc cc])
+AC_PROG_CXX([clang++ g++ c++])
 AC_PROG_RANLIB
 
 # Checks for libraries.
@@ -96,5 +96,5 @@ AC_SUBST([JITTEFEX_HAVE_SFJIT])
 
 # Checks for library functions.
 
-AC_CONFIG_FILES([Makefile src/Makefile src/jittefex/config.h])
+AC_CONFIG_FILES([Makefile src/Makefile examples/Makefile src/jittefex/config.h])
 AC_OUTPUT

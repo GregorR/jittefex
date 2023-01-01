@@ -10,9 +10,3 @@ nobase_include_HEADERS=\
 	jittefex/builder.h jittefex/compile.h jittefex/Instruction.def \
 	jittefex/instruction.h jittefex/ir.h jittefex/jit.h jittefex/type.h \
 	jittefex/config.h
-
-bin_PROGRAMS=jittefex-kaleidoscope
-
-jittefex_kaleidoscope_SOURCES=toy.cc
-jittefex_kaleidoscope_LDFLAGS=@LLVM_LDFLAGS@
-jittefex_kaleidoscope_LDADD=libjittefex.a @LLVM_LIBS@

@@ -15,7 +15,6 @@
 @SET_MAKE@
 
 
-
 VPATH = @srcdir@
 am__is_gnu_make = { \
   if test -z '$(MAKELEVEL)'; then \
@@ -88,7 +87,6 @@ POST_INSTALL = :
 NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
-bin_PROGRAMS = jittefex-kaleidoscope$(EXEEXT)
 subdir = src
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/scripts/lean.m4 \
@@ -101,9 +99,6 @@ mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = acconfig.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
-am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(libdir)" \
-	"$(DESTDIR)$(includedir)"
-PROGRAMS = $(bin_PROGRAMS)
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
     $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
@@ -131,6 +126,7 @@ am__uninstall_files_from_dir = { \
     || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
          $(am__cd) "$$dir" && rm -f $$files; }; \
   }
+am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(includedir)"
 LIBRARIES = $(lib_LIBRARIES)
 AR = ar
 ARFLAGS = cru
@@ -145,11 +141,6 @@ am_libjittefex_a_OBJECTS = libjittefex_a-builder.$(OBJEXT) \
 	libjittefex_a-jit.$(OBJEXT) libjittefex_a-sfjitLir.$(OBJEXT) \
 	libjittefex_a-type.$(OBJEXT)
 libjittefex_a_OBJECTS = $(am_libjittefex_a_OBJECTS)
-am_jittefex_kaleidoscope_OBJECTS = toy.$(OBJEXT)
-jittefex_kaleidoscope_OBJECTS = $(am_jittefex_kaleidoscope_OBJECTS)
-jittefex_kaleidoscope_DEPENDENCIES = libjittefex.a
-jittefex_kaleidoscope_LINK = $(CXXLD) $(AM_CXXFLAGS) $(CXXFLAGS) \
-	$(jittefex_kaleidoscope_LDFLAGS) $(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -170,7 +161,7 @@ am__depfiles_remade = ./$(DEPDIR)/libjittefex_a-builder.Po \
 	./$(DEPDIR)/libjittefex_a-ir.Po \
 	./$(DEPDIR)/libjittefex_a-jit.Po \
 	./$(DEPDIR)/libjittefex_a-sfjitLir.Po \
-	./$(DEPDIR)/libjittefex_a-type.Po ./$(DEPDIR)/toy.Po
+	./$(DEPDIR)/libjittefex_a-type.Po
 am__mv = mv -f
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -189,9 +180,8 @@ AM_V_CXXLD = $(am__v_CXXLD_@AM_V@)
 am__v_CXXLD_ = $(am__v_CXXLD_@AM_DEFAULT_V@)
 am__v_CXXLD_0 = @echo "  CXXLD   " $@;
 am__v_CXXLD_1 = 
-SOURCES = $(libjittefex_a_SOURCES) $(jittefex_kaleidoscope_SOURCES)
-DIST_SOURCES = $(libjittefex_a_SOURCES) \
-	$(jittefex_kaleidoscope_SOURCES)
+SOURCES = $(libjittefex_a_SOURCES)
+DIST_SOURCES = $(libjittefex_a_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -328,9 +318,6 @@ nobase_include_HEADERS = \
 	jittefex/instruction.h jittefex/ir.h jittefex/jit.h jittefex/type.h \
 	jittefex/config.h
 
-jittefex_kaleidoscope_SOURCES = toy.cc
-jittefex_kaleidoscope_LDFLAGS = @LLVM_LDFLAGS@
-jittefex_kaleidoscope_LDADD = libjittefex.a @LLVM_LIBS@
 all: acconfig.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -380,48 +367,6 @@ $(srcdir)/acconfig.h.in:  $(am__configure_deps)
 
 distclean-hdr:
 	-rm -f acconfig.h stamp-h1
-install-binPROGRAMS: $(bin_PROGRAMS)
-	@$(NORMAL_INSTALL)
-	@list='$(bin_PROGRAMS)'; test -n "$(bindir)" || list=; \
-	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(bindir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(bindir)" || exit 1; \
-	fi; \
-	for p in $$list; do echo "$$p $$p"; done | \
-	sed 's/$(EXEEXT)$$//' | \
-	while read p p1; do if test -f $$p \
-	  ; then echo "$$p"; echo "$$p"; else :; fi; \
-	done | \
-	sed -e 'p;s,.*/,,;n;h' \
-	    -e 's|.*|.|' \
-	    -e 'p;x;s,.*/,,;s/$(EXEEXT)$$//;$(transform);s/$$/$(EXEEXT)/' | \
-	sed 'N;N;N;s,\n, ,g' | \
-	$(AWK) 'BEGIN { files["."] = ""; dirs["."] = 1 } \
-	  { d=$$3; if (dirs[d] != 1) { print "d", d; dirs[d] = 1 } \
-	    if ($$2 == $$4) files[d] = files[d] " " $$1; \
-	    else { print "f", $$3 "/" $$4, $$1; } } \
-	  END { for (d in files) print "f", d, files[d] }' | \
-	while read type dir files; do \
-	    if test "$$dir" = .; then dir=; else dir=/$$dir; fi; \
-	    test -z "$$files" || { \
-	      echo " $(INSTALL_PROGRAM_ENV) $(INSTALL_PROGRAM) $$files '$(DESTDIR)$(bindir)$$dir'"; \
-	      $(INSTALL_PROGRAM_ENV) $(INSTALL_PROGRAM) $$files "$(DESTDIR)$(bindir)$$dir" || exit $$?; \
-	    } \
-	; done
-
-uninstall-binPROGRAMS:
-	@$(NORMAL_UNINSTALL)
-	@list='$(bin_PROGRAMS)'; test -n "$(bindir)" || list=; \
-	files=`for p in $$list; do echo "$$p"; done | \
-	  sed -e 'h;s,^.*/,,;s/$(EXEEXT)$$//;$(transform)' \
-	      -e 's/$$/$(EXEEXT)/' \
-	`; \
-	test -n "$$list" || exit 0; \
-	echo " ( cd '$(DESTDIR)$(bindir)' && rm -f" $$files ")"; \
-	cd "$(DESTDIR)$(bindir)" && rm -f $$files
-
-clean-binPROGRAMS:
-	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
 install-libLIBRARIES: $(lib_LIBRARIES)
 	@$(NORMAL_INSTALL)
 	@list='$(lib_LIBRARIES)'; test -n "$(libdir)" || list=; \
@@ -459,10 +404,6 @@ libjittefex.a: $(libjittefex_a_OBJECTS) $(libjittefex_a_DEPENDENCIES) $(EXTRA_li
 	$(AM_V_AR)$(libjittefex_a_AR) libjittefex.a $(libjittefex_a_OBJECTS) $(libjittefex_a_LIBADD)
 	$(AM_V_at)$(RANLIB) libjittefex.a
 
-jittefex-kaleidoscope$(EXEEXT): $(jittefex_kaleidoscope_OBJECTS) $(jittefex_kaleidoscope_DEPENDENCIES) $(EXTRA_jittefex_kaleidoscope_DEPENDENCIES) 
-	@rm -f jittefex-kaleidoscope$(EXEEXT)
-	$(AM_V_CXXLD)$(jittefex_kaleidoscope_LINK) $(jittefex_kaleidoscope_OBJECTS) $(jittefex_kaleidoscope_LDADD) $(LIBS)
-
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 
@@ -475,7 +416,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjittefex_a-jit.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjittefex_a-sfjitLir.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjittefex_a-type.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/toy.Po@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
 	@$(MKDIR_P) $(@D)
@@ -691,9 +631,9 @@ distdir-am: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(PROGRAMS) $(LIBRARIES) $(HEADERS) acconfig.h
+all-am: Makefile $(LIBRARIES) $(HEADERS) acconfig.h
 installdirs:
-	for dir in "$(DESTDIR)$(bindir)" "$(DESTDIR)$(libdir)" "$(DESTDIR)$(includedir)"; do \
+	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(includedir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-am
@@ -728,8 +668,7 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-am
 
-clean-am: clean-binPROGRAMS clean-generic clean-libLIBRARIES \
-	mostlyclean-am
+clean-am: clean-generic clean-libLIBRARIES mostlyclean-am
 
 distclean: distclean-am
 		-rm -f ./$(DEPDIR)/libjittefex_a-builder.Po
@@ -738,7 +677,6 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/libjittefex_a-jit.Po
 	-rm -f ./$(DEPDIR)/libjittefex_a-sfjitLir.Po
 	-rm -f ./$(DEPDIR)/libjittefex_a-type.Po
-	-rm -f ./$(DEPDIR)/toy.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-hdr distclean-tags
@@ -761,7 +699,7 @@ install-dvi: install-dvi-am
 
 install-dvi-am:
 
-install-exec-am: install-binPROGRAMS install-libLIBRARIES
+install-exec-am: install-libLIBRARIES
 
 install-html: install-html-am
 
@@ -790,7 +728,6 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/libjittefex_a-jit.Po
 	-rm -f ./$(DEPDIR)/libjittefex_a-sfjitLir.Po
 	-rm -f ./$(DEPDIR)/libjittefex_a-type.Po
-	-rm -f ./$(DEPDIR)/toy.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
@@ -806,17 +743,15 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-binPROGRAMS uninstall-libLIBRARIES \
-	uninstall-nobase_includeHEADERS
+uninstall-am: uninstall-libLIBRARIES uninstall-nobase_includeHEADERS
 
 .MAKE: all install-am install-strip
 
 .PHONY: CTAGS GTAGS TAGS all all-am am--depfiles check check-am clean \
-	clean-binPROGRAMS clean-generic clean-libLIBRARIES \
-	cscopelist-am ctags ctags-am distclean distclean-compile \
-	distclean-generic distclean-hdr distclean-tags distdir dvi \
-	dvi-am html html-am info info-am install install-am \
-	install-binPROGRAMS install-data install-data-am install-dvi \
+	clean-generic clean-libLIBRARIES cscopelist-am ctags ctags-am \
+	distclean distclean-compile distclean-generic distclean-hdr \
+	distclean-tags distdir dvi dvi-am html html-am info info-am \
+	install install-am install-data install-data-am install-dvi \
 	install-dvi-am install-exec install-exec-am install-html \
 	install-html-am install-info install-info-am \
 	install-libLIBRARIES install-man install-nobase_includeHEADERS \
@@ -824,8 +759,8 @@ uninstall-am: uninstall-binPROGRAMS uninstall-libLIBRARIES \
 	install-strip installcheck installcheck-am installdirs \
 	maintainer-clean maintainer-clean-generic mostlyclean \
 	mostlyclean-compile mostlyclean-generic pdf pdf-am ps ps-am \
-	tags tags-am uninstall uninstall-am uninstall-binPROGRAMS \
-	uninstall-libLIBRARIES uninstall-nobase_includeHEADERS
+	tags tags-am uninstall uninstall-am uninstall-libLIBRARIES \
+	uninstall-nobase_includeHEADERS
 
 .PRECIOUS: Makefile
 
