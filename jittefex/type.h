@@ -69,6 +69,7 @@ class Type {
          * So that types can be map keys.
          */
         inline bool operator<(const Type &other) const {
+            (void) reserved;
             if (baseType < other.baseType)
                 return true;
             if (baseType > other.baseType)

@@ -1093,8 +1093,8 @@ jittefex::Function *PrototypeAST::codegen() {
       TheModule->append(jittefex::Function::create(FT, Name));
 
   // Set names for all arguments.
-  unsigned Idx = 0;
   /* FIXME
+  unsigned Idx = 0;
   for (auto &Arg : F->getLLVMFunction()->args())
     Arg.setName(Args[Idx++]);
     */

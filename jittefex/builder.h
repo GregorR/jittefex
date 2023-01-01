@@ -17,14 +17,15 @@ namespace jittefex {
  */
 class IRBuilder {
     private:
-        Module *mod;
         BasicBlock *insertionPoint;
 
     public:
         inline IRBuilder(Module *mod, BasicBlock *insertionPoint = nullptr)
-            : mod{mod}
-            , insertionPoint{insertionPoint}
-            {}
+            : insertionPoint{insertionPoint}
+        {
+            // The module is only here for familiarity with LLVM
+            (void) mod;
+        }
 
         inline BasicBlock * const getInsertBlock() { return insertionPoint; }
         void setInsertPoint(BasicBlock *to);

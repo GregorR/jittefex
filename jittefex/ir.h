@@ -38,8 +38,8 @@ class BasicBlock {
 
         // Internal
         inline BasicBlock(const std::string &name, Function *parent)
-            : name{name}
-            , parent{parent}
+            : parent{parent}
+            , name{name}
             {}
 
     public:
@@ -147,7 +147,6 @@ class Function {
 class Module {
     private:
         Jittefex *parent;
-        std::string name;
         std::vector<std::unique_ptr<Function>> functions;
         std::unordered_map<std::string, Function *> functionsByName;
 

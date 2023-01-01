@@ -101,10 +101,7 @@ std::unique_ptr<Function> Function::create(
         std::unique_ptr<Function>{new Function{type, name}};
 
 #ifdef JITTEFEX_USE_SFJIT
-    sljit_compiler *c;
-    int stype;
-    ret->sljitCompiler = c =
-        sljit_create_compiler(NULL, NULL);
+    ret->sljitCompiler = sljit_create_compiler(NULL, NULL);
 #endif
 
     return ret;
@@ -140,9 +137,10 @@ void Function::eraseFromParent() {
 }
 
 Module::Module(const std::string &name, Jittefex *jit)
-    : name{name}
-    , parent{jit}
-    {}
+    : parent{jit}
+{
+    (void) name;
+}
 
 Function *Module::append(std::unique_ptr<Function> func) {
     Function *ret = func.get();
