@@ -14,6 +14,7 @@
 #endif
 
 #include <memory>
+#include <optional>
 
 namespace jittefex {
 
@@ -60,7 +61,7 @@ class Jittefex {
         /**
          * Create a Jittefex instance.
          */
-        static llvm::Expected<std::unique_ptr<Jittefex>> create();
+        static std::optional<std::unique_ptr<Jittefex>> create();
 
 #ifdef JITTEFEX_HAVE_LLVM
         inline const llvm::DataLayout &getDataLayout() const { return dl; }
@@ -75,9 +76,11 @@ class Jittefex {
 #endif
 
     private:
+#ifdef JITTEFEX_HAVE_LLVM
         static llvm::Expected<llvm::orc::ThreadSafeModule> optimizeModule(
             llvm::orc::ThreadSafeModule tsm, const llvm::orc::MaterializationResponsibility &r
         );
+#endif
 };
 
 }

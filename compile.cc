@@ -25,6 +25,7 @@
 
 namespace jittefex {
 
+#ifdef JITTEFEX_HAVE_LLVM
 static llvm::ExitOnError exitOnErr;
 
 llvm::Expected<llvm::Value *> toLLVM(
@@ -35,6 +36,7 @@ llvm::Expected<llvm::Value *> toLLVM(
 
 // Quick hack to give each LLVM function a unique name
 unsigned long long llvmNameCtr = 0;
+#endif
 
 void *Function::compile() {
     // FIXME: This needs to support multiple runmodes
@@ -56,6 +58,7 @@ void *Function::compile() {
         return sljitCode;
 #endif
 
+#ifdef JITTEFEX_HAVE_LLVM
     std::string name = this->name + std::to_string(llvmNameCtr++);
 
     // Create a module for this function
@@ -134,8 +137,14 @@ void *Function::compile() {
     auto sym = exitOnErr(jit->lookup(name));
 
     return (void *) sym.getAddress();
+
+#else
+    abort();
+
+#endif
 }
 
+#ifdef JITTEFEX_HAVE_LLVM
 /**
  * Convert this instruction into LLVM.
  */
@@ -347,6 +356,7 @@ llvm::Expected<llvm::Value *> toLLVM(
             );
     }
 }
+#endif
 
 void *compile(Function *func) {
     return func->compile();

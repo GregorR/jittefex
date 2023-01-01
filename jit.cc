@@ -33,8 +33,9 @@ Jittefex::Jittefex(
     llvm::orc::JITTargetMachineBuilder jtmb,
     llvm::DataLayout dl
 #endif
-) :
+)
 #ifdef JITTEFEX_HAVE_LLVM
+    :
     es(std::move(es)),
     dl(std::move(dl)),
     mangle(*this->es, this->dl),
@@ -61,11 +62,11 @@ Jittefex::~Jittefex() {
 #endif
 }
 
-llvm::Expected<std::unique_ptr<Jittefex>> Jittefex::create() {
+std::optional<std::unique_ptr<Jittefex>> Jittefex::create() {
 #ifdef JITTEFEX_HAVE_LLVM
     auto epc = llvm::orc::SelfExecutorProcessControl::Create();
     if (!epc)
-        return epc.takeError();
+        return std::nullopt;
 
     auto es = std::make_unique<llvm::orc::ExecutionSession>(std::move(*epc));
 
@@ -74,13 +75,18 @@ llvm::Expected<std::unique_ptr<Jittefex>> Jittefex::create() {
 
     auto dl = jtmb.getDefaultDataLayoutForTarget();
     if (!dl)
-        return dl.takeError();
+        return std::nullopt;
 
     return std::make_unique<Jittefex>(
         std::move(es), std::move(jtmb), std::move(*dl));
+
+#else
+    return std::make_unique<Jittefex>();
+
 #endif
 }
 
+#ifdef JITTEFEX_HAVE_LLVM
 llvm::Error Jittefex::addModule(
     llvm::orc::ThreadSafeModule tsm, llvm::orc::ResourceTrackerSP rt
 ) {
@@ -116,5 +122,6 @@ llvm::Expected<llvm::orc::ThreadSafeModule> Jittefex::optimizeModule(
 
     return std::move(tsm);
 }
+#endif
 
 }

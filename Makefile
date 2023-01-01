@@ -1,9 +1,16 @@
 CXX=clang++
 LLVM_COMPONENTS=core orcjit native
-CXXFLAGS=-O0 -g
+CXXFLAGS=-std=c++17 -O0 -g
+
+# With LLVM:
 ALLCXXFLAGS=`llvm-config --cxxflags` $(CXXFLAGS)
 LDFLAGS=`llvm-config --ldflags`
 LIBS=`llvm-config --system-libs --libs $(LLVM_COMPONENTS)`
+
+# No LLVM:
+#ALLCXXFLAGS=$(CXXFLAGS)
+#LDFLAGS=
+#LIBS=
 
 OBJS=builder.o compile.o ir.o jit.o sfjitLir.o toy.o type.o
 

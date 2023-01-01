@@ -10,6 +10,12 @@
 #include "llvm/IR/DerivedTypes.h"
 #endif
 
+#include <memory>
+#include <string>
+
+#include <cstddef>
+#include <cstdint>
+
 namespace jittefex {
 
 // Forward ref
@@ -26,7 +32,7 @@ typedef Instruction Value;
 /* Instructions have locations in SLJIT, so these are those locations. */
 struct SLJITLocation {
     int32_t reg = 0;
-    ssize_t off = 0;
+    ptrdiff_t off = 0;
 };
 #endif
 

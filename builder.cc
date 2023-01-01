@@ -13,6 +13,8 @@
 #endif
 #endif
 
+#include <cassert>
+
 #define SJ \
     Function *f = insertionPoint->parent; \
     struct sljit_compiler *sc = (struct sljit_compiler *) f->sljitCompiler; \

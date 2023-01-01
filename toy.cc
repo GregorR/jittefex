@@ -700,7 +700,7 @@ static std::unique_ptr<jittefex::IRBuilder> Builder;
 static std::unique_ptr<jittefex::Module> TheModule;
 static std::map<std::string, jittefex::Instruction *> NamedValues;
 static std::map<std::string, std::unique_ptr<PrototypeAST>> FunctionProtos;
-static llvm::ExitOnError ExitOnErr;
+//static llvm::ExitOnError ExitOnErr;
 
 jittefex::Instruction *LogErrorV(const char *Str) {
   LogError(Str);
@@ -1257,7 +1257,12 @@ int main() {
   fprintf(stderr, "ready> ");
   getNextToken();
 
-  TheJIT = ExitOnErr(jittefex::Jittefex::create());
+  auto MaybeTheJit = jittefex::Jittefex::create();
+  if (!MaybeTheJit) {
+    fprintf(stderr, "Failed to allocate JIT!\n");
+    exit(1);
+  }
+  TheJIT = std::move(MaybeTheJit.value());
   InitializeModule();
 
   // Run the main "interpreter loop" now.
