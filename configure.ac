@@ -17,20 +17,41 @@ AC_PROG_CXX
 AC_PROG_RANLIB
 
 # Checks for libraries.
-llvm-config --libs core orcjit native > /dev/null 2>&1
+
+AC_ARG_WITH([llvm],
+    [AS_HELP_STRING([--with-llvm], [enable support for LLVM's ORC JIT])],
+    [],
+    [with_llvm=maybe])
+#'
+LLVM_CXXFLAGS=
+LLVM_LDFLAGS=
+LLVM_LIBS=
+JITTEFEX_HAVE_LLVM='#undef JITTEFEX_HAVE_LLVM'
+AS_IF([test x"$with_llvm" != xno], [
+printf 'checking for LLVM... '
+LLVM_CONFIG=llvm-config
+if test x"$with_llvm" != xyes -a x"$with_llvm" != xmaybe
+then
+    LLVM_CONFIG="$with_llvm/bin/llvm-config"
+fi
+$[]LLVM_CONFIG --libs core orcjit native > /dev/null 2>&1
 if test "$?" = "0"
 then
+    printf 'yes\n'
     AC_DEFINE([HAVE_LLVM], [1], [LLVM is available])
-    LLVM_CXXFLAGS="`llvm-config --cxxflags`"
-    LLVM_LDFLAGS="`llvm-config --ldflags`"
-    LLVM_LIBS="`llvm-config --libs core orcjit native` `llvm-config --system-libs core orcjit native`"
+    LLVM_CXXFLAGS="`$[]LLVM_CONFIG --cxxflags`"
+    LLVM_LDFLAGS="`$[]LLVM_CONFIG --ldflags`"
+    LLVM_LIBS="`$[]LLVM_CONFIG --libs core orcjit native` `$[]LLVM_CONFIG --system-libs core orcjit native`"
     JITTEFEX_HAVE_LLVM='#define JITTEFEX_HAVE_LLVM 1'
 else
-    LLVM_CXXFLAGS=
-    LLVM_LDFLAGS=
-    LLVM_LIBS=
-    JITTEFEX_HAVE_LLVM='#undef JITTEFEX_HAVE_LLVM'
+    printf 'no\n'
+    if test x"$with_llvm" != xmaybe
+    then
+        $[]LLVM_CONFIG --libs core orcjit native
+        exit 1
+    fi
 fi
+])
 AC_SUBST([LLVM_CXXFLAGS])
 AC_SUBST([LLVM_LDFLAGS])
 AC_SUBST([LLVM_LIBS])
