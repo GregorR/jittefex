@@ -227,16 +227,31 @@ Instruction *IRBuilder::createCondBr(
 Instruction *IRBuilder::createAdd(
     Instruction *l, Instruction *r, const std::string &name
 ) {
-#ifdef JITTEFEX_USE_SFJIT
-    abort();
-#endif
     // FIXME
     (void) name;
     assert(l->getType() == r->getType());
-    return insertionPoint->append(
+    Instruction *ret = insertionPoint->append(
         std::make_unique<BinaryInst>(insertionPoint, Opcode::Add, l->getType(),
             l, r)
     );
+
+#ifdef JITTEFEX_USE_SFJIT
+    SJ {
+        int stype = l->getType().getSLJITType();
+        sljit_s32 op;
+
+        if (!f->sljitAllocateRegister(false, ret->sljitLoc))
+            SCANCEL();
+
+        if (sljit_emit_op2(sc, SLJIT_ADD,
+            ret->sljitLoc.reg, ret->sljitLoc.off,
+            l->sljitLoc.reg, l->sljitLoc.off,
+            r->sljitLoc.reg, r->sljitLoc.off))
+            SCANCEL();
+    }
+#endif
+
+    return ret;
 }
 
 // 1225
@@ -303,14 +318,41 @@ Instruction *IRBuilder::createMul(
 Instruction *IRBuilder::createFAdd(
     Instruction *l, Instruction *r, const std::string &name
 ) {
-#ifdef JITTEFEX_USE_SFJIT
-    abort();
-#endif
     // FIXME
     (void) name;
     assert(l->getType() == r->getType());
-    return insertionPoint->append(
+    Instruction *ret = insertionPoint->append(
         std::make_unique<BinaryInst>(insertionPoint, Opcode::FAdd, l->getType(), l, r));
+
+#ifdef JITTEFEX_USE_SFJIT
+    SJ {
+        int stype = l->getType().getSLJITType();
+        sljit_s32 op;
+
+        switch (stype) {
+            case SLJIT_ARG_TYPE_F64:
+                op = SLJIT_ADD_F64;
+                break;
+
+            case SLJIT_ARG_TYPE_F32:
+                op = SLJIT_ADD_F32;
+                break;
+
+            default:
+                SCANCEL();
+        }
+
+        if (!f->sljitAllocateRegister(true, ret->sljitLoc))
+            SCANCEL();
+
+        if (sljit_emit_fop2(sc, op, ret->sljitLoc.reg, ret->sljitLoc.off,
+            l->sljitLoc.reg, l->sljitLoc.off,
+            r->sljitLoc.reg, r->sljitLoc.off))
+            SCANCEL();
+    }
+#endif
+
+    return ret;
 }
 
 // 1448
