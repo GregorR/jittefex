@@ -9,6 +9,8 @@
 #include "llvm/IR/IRBuilder.h"
 #endif
 
+#include <cassert>
+
 namespace jittefex {
 
 /**
