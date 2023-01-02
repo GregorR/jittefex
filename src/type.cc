@@ -10,21 +10,63 @@ namespace jittefex {
 
 #ifdef JITTEFEX_HAVE_LLVM
 llvm::Type *Type::getLLVMType(llvm::LLVMContext &context) const {
-    if (baseType == BaseType::Float && width == 8)
-        return llvm::Type::getDoubleTy(context);
+    switch (baseType) {
+        case BaseType::Void:
+            return llvm::Type::getVoidTy(context);
 
-    // FIXME
-    return nullptr;
+        case BaseType::Signed:
+        case BaseType::Unsigned:
+            return llvm::Type::getIntNTy(context, width * 8);
+
+        case BaseType::Float:
+            if (width == 8)
+                return llvm::Type::getDoubleTy(context);
+            else if (width == 4)
+                return llvm::Type::getFloatTy(context);
+            else if (width == 2)
+                return llvm::Type::getHalfTy(context);
+            else
+                abort();
+
+        case BaseType::Pointer:
+            return llvm::Type::getVoidTy(context)->getPointerTo();
+
+        default:
+            abort();
+    }
 }
 #endif
 
 #ifdef JITTEFEX_HAVE_SFJIT
 int Type::getSLJITType() const {
-    if (baseType == BaseType::Float && width == 8)
-        return SLJIT_ARG_TYPE_F64;
+    switch (baseType) {
+        case BaseType::Signed:
+        case BaseType::Unsigned:
+#if (defined SLJIT_64BIT_ARCHITECTURE && SLJIT_64BIT_ARCHITECTURE)
+            if (width == 8)
+                return SLJIT_ARG_TYPE_W;
+            else if (width == 4)
+                return SLJIT_ARG_TYPE_32;
+            else
+                return -1;
+#else
+            if (width == 4)
+                return SLJIT_ARG_TYPE_W;
+            else
+                return -1;
+#endif
 
-    // FIXME
-    return -1;
+        case BaseType::Float:
+            if (width == 8)
+                return SLJIT_ARG_TYPE_F64;
+            else if (width == 4)
+                return SLJIT_ARG_TYPE_F32;
+            else
+                return -1;
+
+        default:
+            return -1;
+    }
 }
 #endif
 

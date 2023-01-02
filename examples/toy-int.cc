@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cctype>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -61,7 +62,7 @@ enum Token {
 };
 
 static std::string IdentifierStr; // Filled in if tok_identifier
-static double NumVal;             // Filled in if tok_number
+static ptrdiff_t NumVal;             // Filled in if tok_number
 
 /// gettok - Return the next token from standard input.
 static int gettok() {
@@ -106,7 +107,7 @@ static int gettok() {
       LastChar = getchar();
     } while (isdigit(LastChar) || LastChar == '.');
 
-    NumVal = strtod(NumStr.c_str(), nullptr);
+    NumVal = (ptrdiff_t) strtoll(NumStr.c_str(), nullptr, 10);
     return tok_number;
   }
 
@@ -146,10 +147,10 @@ public:
 
 /// NumberExprAST - Expression class for numeric literals like "1.0".
 class NumberExprAST : public ExprAST {
-  double Val;
+  ptrdiff_t Val;
 
 public:
-  NumberExprAST(double Val) : Val(Val) {}
+  NumberExprAST(ptrdiff_t Val) : Val(Val) {}
 
   jittefex::Instruction *codegen() override;
 };
@@ -729,11 +730,11 @@ jittefex::Function *getFunction(std::string Name) {
 static jittefex::Instruction *CreateEntryBlockAlloca(jittefex::Function *TheFunction,
                                           const std::string &VarName) {
   jittefex::IRBuilder TmpB(TheModule.get(), TheFunction->getEntryBlock());
-  return TmpB.createAlloca(jittefex::Type::floatType(8), nullptr, VarName);
+  return TmpB.createAlloca(jittefex::Type::signedWordType(), nullptr, VarName);
 }
 
 jittefex::Instruction *NumberExprAST::codegen() {
-  return Builder->createFltLiteral(jittefex::Type::floatType(8), Val);
+  return Builder->createIntLiteral(jittefex::Type::signedWordType(), Val);
 }
 
 jittefex::Instruction *VariableExprAST::codegen() {
@@ -743,7 +744,7 @@ jittefex::Instruction *VariableExprAST::codegen() {
     return LogErrorV("Unknown variable name");
 
   // Load the value.
-  return Builder->createLoad(jittefex::Type::floatType(8), V, false, Name.c_str());
+  return Builder->createLoad(jittefex::Type::signedWordType(), V, false, Name.c_str());
 }
 
 jittefex::Instruction *UnaryExprAST::codegen() {
@@ -796,19 +797,19 @@ jittefex::Instruction *BinaryExprAST::codegen() {
   jittefex::Instruction *ret = nullptr;
   switch (Op) {
   case '+':
-    ret = Builder->createFAdd(L, R, "addtmp");
+    ret = Builder->createAdd(L, R, "addtmp");
     break;
   case '-':
-    ret = Builder->createFSub(L, R, "subtmp");
+    ret = Builder->createSub(L, R, "subtmp");
     break;
   case '*':
-    ret = Builder->createFMul(L, R, "multmp");
+    ret = Builder->createMul(L, R, "multmp");
     break;
   case '<':
   {
-    auto *Ltmp = Builder->createFCmpULT(L, R, "cmptmp");
-    // Convert bool 0/1 to double 0.0 or 1.0
-    ret = Builder->createUIToFP(Ltmp, jittefex::Type::floatType(8), "booltmp");
+    auto *Ltmp = Builder->createICmpSLT(L, R, "cmptmp");
+    // Convert bool 0/1 to ptrdiff_t 0.0 or 1.0
+    ret = Builder->createZExtOrTrunc(Ltmp, jittefex::Type::signedWordType(), "booltmp");
     break;
   }
   default:
@@ -862,15 +863,15 @@ jittefex::Instruction *CallExprAST::codegen() {
 
 jittefex::Instruction *IfExprAST::codegen() {
   // Allocate space for the result (this should phi out in LLVM)
-  jittefex::Instruction *Res = Builder->createAlloca(jittefex::Type::floatType(8));
+  jittefex::Instruction *Res = Builder->createAlloca(jittefex::Type::signedWordType());
 
   jittefex::Instruction *CondV = Cond->codegen();
   if (!CondV)
     return nullptr;
 
   // Convert condition to a bool by comparing equal to 0.0.
-  auto *zero = Builder->createFltLiteral(jittefex::Type::floatType(8), 0.0);
-  CondV = Builder->createFCmpONE(
+  auto *zero = Builder->createIntLiteral(jittefex::Type::signedWordType(), 0);
+  CondV = Builder->createICmpNE(
       CondV, zero, "ifcond");
   Builder->release(zero);
 
@@ -925,11 +926,11 @@ jittefex::Instruction *IfExprAST::codegen() {
   */
 
   // Instead, load the value
-  return Builder->createLoad(jittefex::Type::floatType(8), Res);
+  return Builder->createLoad(jittefex::Type::signedWordType(), Res);
 }
 
 // Output for-loop as:
-//   var = alloca double
+//   var = alloca ptrdiff_t
 //   ...
 //   start = startexpr
 //   store start -> var
@@ -991,7 +992,7 @@ jittefex::Instruction *ForExprAST::codegen() {
       return nullptr;
   } else {
     // If not specified, use 1.0.
-    StepVal = Builder->createFltLiteral(jittefex::Type::floatType(8), 1.0);
+    StepVal = Builder->createIntLiteral(jittefex::Type::signedWordType(), 1);
   }
 
   // Compute the end condition.
@@ -1001,17 +1002,17 @@ jittefex::Instruction *ForExprAST::codegen() {
 
   // Reload, increment, and restore the alloca.  This handles the case where
   // the body of the loop mutates the variable.
-  jittefex::Instruction *CurVar = Builder->createLoad(jittefex::Type::floatType(8), Alloca,
+  jittefex::Instruction *CurVar = Builder->createLoad(jittefex::Type::signedWordType(), Alloca,
                                       VarName.c_str());
-  jittefex::Instruction *NextVar = Builder->createFAdd(CurVar, StepVal, "nextvar");
+  jittefex::Instruction *NextVar = Builder->createAdd(CurVar, StepVal, "nextvar");
   Builder->release(CurVar);
   Builder->release(StepVal);
   Builder->createStore(NextVar, Alloca);
   Builder->release(NextVar);
 
   // Convert condition to a bool by comparing equal to 0.0.
-  auto *zero = Builder->createFltLiteral(jittefex::Type::floatType(8), 0.0);
-  EndCond = Builder->createFCmpONE(
+  auto *zero = Builder->createIntLiteral(jittefex::Type::signedWordType(), 0);
+  EndCond = Builder->createICmpNE(
       EndCond, zero, "loopcond");
   Builder->release(zero);
 
@@ -1033,7 +1034,7 @@ jittefex::Instruction *ForExprAST::codegen() {
     NamedValues.erase(VarName);
 
   // for expr always returns 0.0.
-  return Builder->createFltLiteral(jittefex::Type::floatType(8), 0.0);
+  return Builder->createIntLiteral(jittefex::Type::signedWordType(), 0);
 }
 
 jittefex::Instruction *VarExprAST::codegen() {
@@ -1057,7 +1058,7 @@ jittefex::Instruction *VarExprAST::codegen() {
       if (!InitVal)
         return nullptr;
     } else { // If not specified, use 0.0.
-      InitVal = Builder->createFltLiteral(jittefex::Type::floatType(8), 0.0);
+      InitVal = Builder->createIntLiteral(jittefex::Type::signedWordType(), 0);
     }
 
     jittefex::Instruction *Alloca = CreateEntryBlockAlloca(TheFunction, VarName);
@@ -1086,10 +1087,10 @@ jittefex::Instruction *VarExprAST::codegen() {
 }
 
 jittefex::Function *PrototypeAST::codegen() {
-  // Make the function type:  double(double,double) etc.
-  std::vector<jittefex::Type> Doubles(Args.size(), jittefex::Type::floatType(8));
+  // Make the function type:  ptrdiff_t(ptrdiff_t,ptrdiff_t) etc.
+  std::vector<jittefex::Type> Doubles(Args.size(), jittefex::Type::signedWordType());
   jittefex::FunctionType *FT =
-      jittefex::FunctionType::get(jittefex::Type::floatType(8), Doubles, false);
+      jittefex::FunctionType::get(jittefex::Type::signedWordType(), Doubles, false);
 
   jittefex::Function *F =
       TheModule->append(jittefex::Function::create(FT, Name));
@@ -1222,16 +1223,16 @@ static void HandleTopLevelExpression() {
       auto Sym = ExitOnErr(TheJIT->lookup("__anon_expr"));
 
       // Get the symbol's address and cast it to the right type (takes no
-      // arguments, returns a double) so we can call it as a native function.
-      auto *FP = (double (*)())(intptr_t)Sym.getAddress();
-      fprintf(stderr, "Evaluated to %f\n", FP());
+      // arguments, returns a ptrdiff_t) so we can call it as a native function.
+      auto *FP = (ptrdiff_t (*)())(intptr_t)Sym.getAddress();
+      fprintf(stderr, "Evaluated to %d\n", FP());
 
       // Delete the anonymous expression module from the JIT.
       ExitOnErr(RT->remove());
 #endif
-      double (*f)();
-      f = (double(*)()) F->compile();
-      fprintf(stderr, "Evaluated to %f\n", f());
+      ptrdiff_t (*f)();
+      f = (ptrdiff_t(*)()) F->compile();
+      fprintf(stderr, "Evaluated to %d\n", (int) f());
       InitializeModule();
     }
   } else {
@@ -1267,15 +1268,15 @@ static void MainLoop() {
 // "Library" functions that can be "extern'd" from user code.
 //===----------------------------------------------------------------------===//
 
-/// putchard - putchar that takes a double and returns 0.
-extern "C" double putchard(double X) {
+/// putchard - putchar that takes a ptrdiff_t and returns 0.
+extern "C" ptrdiff_t putchard(ptrdiff_t X) {
   fputc((char)X, stderr);
   return 0;
 }
 
-/// printd - printf that takes a double prints it as "%f\n", returning 0.
-extern "C" double printd(double X) {
-  fprintf(stderr, "%f\n", X);
+/// printd - printf that takes a ptrdiff_t prints it as "%d\n", returning 0.
+extern "C" ptrdiff_t printd(ptrdiff_t X) {
+  fprintf(stderr, "%d\n", (int) X);
   return 0;
 }
 

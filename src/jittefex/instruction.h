@@ -70,8 +70,11 @@ enum Opcode {
     MetaOpsEnd = 1102,
 
     LiteralOpsBegin = 1200,
-    FLiteral = 1201,
-    FuncLiteral = 1202,
+    SLiteral = 1201,
+    ULiteral = 1202,
+    FLiteral = 1203,
+    PLiteral = 1204,
+    FuncLiteral = 1205,
     LiteralOpsEnd = 1203
 };
 
@@ -253,11 +256,11 @@ class StoreInst : public Instruction {
 };
 
 /**
- * Numeric conversions of all forms.
+ * Typecasts of all forms.
  */
-class ConvInst : public UnaryInst {
+class CastInst : public UnaryInst {
     public:
-        inline ConvInst(
+        inline CastInst(
             BasicBlock *parent, Opcode opcode, Instruction *val,
             const Type &destTy
         )
@@ -287,6 +290,25 @@ class CmpInst : public BinaryInst {
         J_GETTERS(bool, Gt, gt)
         J_GETTERS(bool, Lt, lt)
         J_GETTERS(bool, Eq, eq)
+};
+
+/**
+ * Integer comparisons. Includes everything in Cmp, but also the signedness.
+ */
+class ICmpInst : public CmpInst {
+    private:
+        bool signd;
+
+    public:
+        inline ICmpInst(
+            BasicBlock *parent, Instruction *l, Instruction *r, bool signd,
+            bool gt, bool lt, bool eq
+        )
+            : CmpInst(parent, Opcode::ICmp, l, r, gt, lt, eq)
+            , signd{signd}
+            {}
+
+        J_GETTERS(bool, Signed, signd)
 };
 
 /**
@@ -358,12 +380,22 @@ class ArgInst : public Instruction {
 class LiteralInst : public Instruction {
     private:
         union {
-            double fltValue;
             long long sValue;
             unsigned long long uValue;
+            double fltValue;
         };
 
     public:
+        inline LiteralInst(
+            BasicBlock *parent, const Type &type, long long sValue
+        )
+            : Instruction(parent,
+                type.getBaseType() == BaseType::Signed
+                    ? Opcode::SLiteral : Opcode::ULiteral,
+                type)
+            , sValue{sValue}
+            {}
+
         inline LiteralInst(
             BasicBlock *parent, const Type &type, double fltValue
         )

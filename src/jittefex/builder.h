@@ -57,6 +57,18 @@ class IRBuilder {
             Instruction *cond, BasicBlock *ifTrue, BasicBlock *ifFalse
         );
 
+        Instruction *createAdd(
+            Instruction *l, Instruction *r, const std::string &name = ""
+        );
+
+        Instruction *createSub(
+            Instruction *l, Instruction *r, const std::string &name = ""
+        );
+
+        Instruction *createMul(
+            Instruction *l, Instruction *r, const std::string &name = ""
+        );
+
         Instruction *createFAdd(
             Instruction *l, Instruction *r, const std::string &name = ""
         );
@@ -83,8 +95,43 @@ class IRBuilder {
             Instruction *val, Instruction *ptr, bool isVolatile = false
         );
 
+        Instruction *createTrunc(
+            Instruction *v, const Type &destTy, const std::string &name = ""
+        );
+
+        Instruction *createZExt(
+            Instruction *v, const Type &destTy, const std::string &name = ""
+        );
+
+        Instruction *createSExt(
+            Instruction *v, const Type &destTy, const std::string &name = ""
+        );
+
+        inline Instruction *createZExtOrTrunc(
+            Instruction *v, const Type &destTy, const std::string &name = ""
+        ) {
+            Type vTy = v->getType();
+            assert((vTy.getBaseType() == BaseType::Signed ||
+                    vTy.getBaseType() == BaseType::Unsigned) &&
+                   (destTy.getBaseType() == BaseType::Signed ||
+                    destTy.getBaseType() == BaseType::Unsigned));
+            if (vTy.getWidth() < destTy.getWidth())
+                return createZExt(v, destTy, name);
+            if (vTy.getWidth() > destTy.getWidth())
+                return createTrunc(v, destTy, name);
+            return v;
+        }
+
         Instruction *createUIToFP(
             Instruction *val, const Type &destTy, const std::string &name = ""
+        );
+
+        Instruction *createICmpNE(
+            Instruction *l, Instruction *r, const std::string &name = ""
+        );
+
+        Instruction *createICmpSLT(
+            Instruction *l, Instruction *r, const std::string &name = ""
         );
 
         Instruction *createFCmpONE(
@@ -103,7 +150,9 @@ class IRBuilder {
 
         Instruction *createArg(int idx);
 
-        Instruction *createFltLiteral(double val);
+        Instruction *createIntLiteral(const Type &ty, long long val);
+
+        Instruction *createFltLiteral(const Type &ty, double val);
 
         Instruction *createFuncLiteral(Function *val);
 };

@@ -112,6 +112,8 @@ class Function {
             {}
 
     public:
+        ~Function();
+
         static std::unique_ptr<Function> create(
             FunctionType *type, const std::string &name = ""
         );

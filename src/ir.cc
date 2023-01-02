@@ -94,6 +94,13 @@ void Function::sljitReleaseRegister(bool flt, const SLJITLocation &loc) {
 }
 #endif
 
+Function::~Function() {
+#ifdef JITTEFEX_USE_SFJIT
+    if (sljitCompiler)
+        sljit_free_compiler((struct sljit_compiler *) sljitCompiler);
+#endif
+}
+
 std::unique_ptr<Function> Function::create(
     FunctionType *type, const std::string &name
 ) {
@@ -110,6 +117,9 @@ std::unique_ptr<Function> Function::create(
 #ifdef JITTEFEX_HAVE_SFJIT
 void Function::cancelSLJIT() {
     if (sljitCompiler) {
+#ifdef DEBUG
+        abort();
+#endif
         sljit_free_compiler((struct sljit_compiler *) sljitCompiler);
         sljitCompiler = NULL;
     }

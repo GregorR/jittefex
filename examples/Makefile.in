@@ -86,7 +86,8 @@ POST_INSTALL = :
 NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
-bin_PROGRAMS = jittefex-kaleidoscope$(EXEEXT)
+bin_PROGRAMS = jittefex-kaleidoscope$(EXEEXT) \
+	jittefex-kaleidoscope-int$(EXEEXT)
 subdir = examples
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/scripts/lean.m4 \
@@ -107,6 +108,14 @@ jittefex_kaleidoscope_DEPENDENCIES = ../src/libjittefex.a
 jittefex_kaleidoscope_LINK = $(CXXLD) \
 	$(jittefex_kaleidoscope_CXXFLAGS) $(CXXFLAGS) \
 	$(jittefex_kaleidoscope_LDFLAGS) $(LDFLAGS) -o $@
+am_jittefex_kaleidoscope_int_OBJECTS =  \
+	jittefex_kaleidoscope_int-toy-int.$(OBJEXT)
+jittefex_kaleidoscope_int_OBJECTS =  \
+	$(am_jittefex_kaleidoscope_int_OBJECTS)
+jittefex_kaleidoscope_int_DEPENDENCIES = ../src/libjittefex.a
+jittefex_kaleidoscope_int_LINK = $(CXXLD) \
+	$(jittefex_kaleidoscope_int_CXXFLAGS) $(CXXFLAGS) \
+	$(jittefex_kaleidoscope_int_LDFLAGS) $(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -122,7 +131,8 @@ am__v_at_1 =
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)/src
 depcomp = $(SHELL) $(top_srcdir)/scripts/depcomp
 am__maybe_remake_depfiles = depfiles
-am__depfiles_remade = ./$(DEPDIR)/jittefex_kaleidoscope-toy.Po
+am__depfiles_remade = ./$(DEPDIR)/jittefex_kaleidoscope-toy.Po \
+	./$(DEPDIR)/jittefex_kaleidoscope_int-toy-int.Po
 am__mv = mv -f
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -141,8 +151,10 @@ AM_V_CXXLD = $(am__v_CXXLD_@AM_V@)
 am__v_CXXLD_ = $(am__v_CXXLD_@AM_DEFAULT_V@)
 am__v_CXXLD_0 = @echo "  CXXLD   " $@;
 am__v_CXXLD_1 = 
-SOURCES = $(jittefex_kaleidoscope_SOURCES)
-DIST_SOURCES = $(jittefex_kaleidoscope_SOURCES)
+SOURCES = $(jittefex_kaleidoscope_SOURCES) \
+	$(jittefex_kaleidoscope_int_SOURCES)
+DIST_SOURCES = $(jittefex_kaleidoscope_SOURCES) \
+	$(jittefex_kaleidoscope_int_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -270,6 +282,10 @@ jittefex_kaleidoscope_SOURCES = toy.cc
 jittefex_kaleidoscope_CXXFLAGS = @LLVM_CXXFLAGS@ -std=c++17 -I${srcdir}/../src -I../src
 jittefex_kaleidoscope_LDFLAGS = @LLVM_LDFLAGS@
 jittefex_kaleidoscope_LDADD = ../src/libjittefex.a @LLVM_LIBS@
+jittefex_kaleidoscope_int_SOURCES = toy-int.cc
+jittefex_kaleidoscope_int_CXXFLAGS = @LLVM_CXXFLAGS@ -std=c++17 -I${srcdir}/../src -I../src
+jittefex_kaleidoscope_int_LDFLAGS = @LLVM_LDFLAGS@
+jittefex_kaleidoscope_int_LDADD = ../src/libjittefex.a @LLVM_LIBS@
 all: all-am
 
 .SUFFIXES:
@@ -350,6 +366,10 @@ jittefex-kaleidoscope$(EXEEXT): $(jittefex_kaleidoscope_OBJECTS) $(jittefex_kale
 	@rm -f jittefex-kaleidoscope$(EXEEXT)
 	$(AM_V_CXXLD)$(jittefex_kaleidoscope_LINK) $(jittefex_kaleidoscope_OBJECTS) $(jittefex_kaleidoscope_LDADD) $(LIBS)
 
+jittefex-kaleidoscope-int$(EXEEXT): $(jittefex_kaleidoscope_int_OBJECTS) $(jittefex_kaleidoscope_int_DEPENDENCIES) $(EXTRA_jittefex_kaleidoscope_int_DEPENDENCIES) 
+	@rm -f jittefex-kaleidoscope-int$(EXEEXT)
+	$(AM_V_CXXLD)$(jittefex_kaleidoscope_int_LINK) $(jittefex_kaleidoscope_int_OBJECTS) $(jittefex_kaleidoscope_int_LDADD) $(LIBS)
+
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 
@@ -357,6 +377,7 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/jittefex_kaleidoscope-toy.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/jittefex_kaleidoscope_int-toy-int.Po@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
 	@$(MKDIR_P) $(@D)
@@ -391,6 +412,20 @@ jittefex_kaleidoscope-toy.obj: toy.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='toy.cc' object='jittefex_kaleidoscope-toy.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(jittefex_kaleidoscope_CXXFLAGS) $(CXXFLAGS) -c -o jittefex_kaleidoscope-toy.obj `if test -f 'toy.cc'; then $(CYGPATH_W) 'toy.cc'; else $(CYGPATH_W) '$(srcdir)/toy.cc'; fi`
+
+jittefex_kaleidoscope_int-toy-int.o: toy-int.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(jittefex_kaleidoscope_int_CXXFLAGS) $(CXXFLAGS) -MT jittefex_kaleidoscope_int-toy-int.o -MD -MP -MF $(DEPDIR)/jittefex_kaleidoscope_int-toy-int.Tpo -c -o jittefex_kaleidoscope_int-toy-int.o `test -f 'toy-int.cc' || echo '$(srcdir)/'`toy-int.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/jittefex_kaleidoscope_int-toy-int.Tpo $(DEPDIR)/jittefex_kaleidoscope_int-toy-int.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='toy-int.cc' object='jittefex_kaleidoscope_int-toy-int.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(jittefex_kaleidoscope_int_CXXFLAGS) $(CXXFLAGS) -c -o jittefex_kaleidoscope_int-toy-int.o `test -f 'toy-int.cc' || echo '$(srcdir)/'`toy-int.cc
+
+jittefex_kaleidoscope_int-toy-int.obj: toy-int.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(jittefex_kaleidoscope_int_CXXFLAGS) $(CXXFLAGS) -MT jittefex_kaleidoscope_int-toy-int.obj -MD -MP -MF $(DEPDIR)/jittefex_kaleidoscope_int-toy-int.Tpo -c -o jittefex_kaleidoscope_int-toy-int.obj `if test -f 'toy-int.cc'; then $(CYGPATH_W) 'toy-int.cc'; else $(CYGPATH_W) '$(srcdir)/toy-int.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/jittefex_kaleidoscope_int-toy-int.Tpo $(DEPDIR)/jittefex_kaleidoscope_int-toy-int.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='toy-int.cc' object='jittefex_kaleidoscope_int-toy-int.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(jittefex_kaleidoscope_int_CXXFLAGS) $(CXXFLAGS) -c -o jittefex_kaleidoscope_int-toy-int.obj `if test -f 'toy-int.cc'; then $(CYGPATH_W) 'toy-int.cc'; else $(CYGPATH_W) '$(srcdir)/toy-int.cc'; fi`
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique
@@ -519,6 +554,7 @@ clean-am: clean-binPROGRAMS clean-generic mostlyclean-am
 
 distclean: distclean-am
 		-rm -f ./$(DEPDIR)/jittefex_kaleidoscope-toy.Po
+	-rm -f ./$(DEPDIR)/jittefex_kaleidoscope_int-toy-int.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -565,6 +601,7 @@ installcheck-am:
 
 maintainer-clean: maintainer-clean-am
 		-rm -f ./$(DEPDIR)/jittefex_kaleidoscope-toy.Po
+	-rm -f ./$(DEPDIR)/jittefex_kaleidoscope_int-toy-int.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 

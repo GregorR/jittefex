@@ -53,8 +53,16 @@ class Type {
             return Type{BaseType::Signed, width};
         }
 
+        static inline Type signedWordType() {
+            return Type{BaseType::Signed, sizeof(void *)};
+        }
+
         static inline Type unsignedType(unsigned short width) {
             return Type{BaseType::Unsigned, width};
+        }
+
+        static inline Type unsignedWordType() {
+            return Type{BaseType::Unsigned, sizeof(void *)};
         }
 
         static inline Type floatType(unsigned short width) {
@@ -97,8 +105,8 @@ class Type {
 	int getSLJITType() const;
 #endif
 
-        inline const BaseType getBaseType() { return baseType; }
-        inline const short getWidth() { return width; }
+        inline const BaseType getBaseType() const { return baseType; }
+        inline const short getWidth() const { return width; }
 };
 
 /**
