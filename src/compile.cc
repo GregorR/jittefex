@@ -174,6 +174,12 @@ llvm::Expected<llvm::Value *> toLLVM(
             return builder.CreateFSub(ic(i->getL()), ic(i->getR()));
         }
 
+        case Opcode::Mul: // 17
+        {
+            auto i = (BinaryInst *) instr;
+            return builder.CreateMul(ic(i->getL()), ic(i->getR()));
+        }
+
         case Opcode::FMul: // 18
         {
             auto i = (BinaryInst *) instr;
@@ -331,13 +337,27 @@ llvm::Expected<llvm::Value *> toLLVM(
             );
         }
 
-        case Opcode::FLiteral: // 1201
+        case Opcode::SLiteral: // 1201
+        {
+            auto i = (LiteralInst *) instr;
+            return llvm::ConstantInt::getSigned(
+                i->getType().getLLVMType(context), i->getSValue());
+        }
+
+        case Opcode::ULiteral: // 1202
+        {
+            auto i = (LiteralInst *) instr;
+            return llvm::ConstantInt::get(
+                i->getType().getLLVMType(context), i->getUValue());
+        }
+
+        case Opcode::FLiteral: // 1203
         {
             auto i = (LiteralInst *) instr;
             return llvm::ConstantFP::get(context, llvm::APFloat(i->getFltValue()));
         }
 
-        case Opcode::FuncLiteral: // 1202
+        case Opcode::FuncLiteral: // 1205
         {
             auto i = (FuncLiteralInst *) instr;
             return llvm::Constant::getIntegerValue(
