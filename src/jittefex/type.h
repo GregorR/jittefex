@@ -21,7 +21,8 @@ enum BaseType {
     Signed,
     Unsigned,
     Float,
-    Pointer
+    Pointer,
+    CodePointer
 };
 
 /**
@@ -71,6 +72,10 @@ class Type {
 
         static inline Type pointerType() {
             return Type{BaseType::Pointer, sizeof(void *)};
+        }
+
+        static inline Type codePointerType() {
+            return Type{BaseType::CodePointer, sizeof(void (*)(void))};
         }
 
         /**

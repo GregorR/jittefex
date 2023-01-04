@@ -75,7 +75,8 @@ enum Opcode {
     FLiteral = 1203,
     PLiteral = 1204,
     FuncLiteral = 1205,
-    LiteralOpsEnd = 1203
+    CodeLiteral = 1206,
+    LiteralOpsEnd = 1207
 };
 
 #define J_GETTERS(type, nameU, nameL) \
@@ -422,6 +423,22 @@ class FuncLiteralInst : public Instruction {
             {}
 
         J_GETTERS(Function *, Value, value)
+};
+
+/**
+ * Code literal (reference to non-Jittefex code).
+ */
+class CodeLiteralInst : public Instruction {
+    private:
+        void *value;
+
+    public:
+        inline CodeLiteralInst(BasicBlock *parent, void *value)
+            : Instruction(parent, Opcode::CodeLiteral, Type::codePointerType())
+            , value{value}
+            {}
+
+        J_GETTERS(void *, Value, value)
 };
 
 #undef J_GETTERS

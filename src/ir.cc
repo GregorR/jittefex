@@ -76,6 +76,9 @@ bool Function::sljitAllocateStack(SLJITLocation &loc) {
 
 void Function::sljitReleaseRegister(bool flt, const SLJITLocation &loc) {
     // Check if it actually is a register
+    if (loc.reg == SLJIT_IMM)
+        return;
+
     if (flt) {
         if (loc.reg <= SLJIT_FS0) {
             sljitFRegs[SLJIT_FS0 - loc.reg] = false;

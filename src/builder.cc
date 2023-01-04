@@ -205,22 +205,47 @@ Instruction *IRBuilder::createRet(
 Instruction *IRBuilder::createBr(
     BasicBlock *dest
 ) {
-#ifdef JITTEFEX_USE_SFJIT
-    abort();
-#endif
-    return insertionPoint->append(
+    Instruction *ret = insertionPoint->append(
         std::make_unique<BrInst>(insertionPoint, dest));
+
+#ifdef JITTEFEX_USE_SFJIT
+    SJ {
+        struct sljit_jump *sj;
+
+        if (!(sj = sljit_emit_jump(sc, SLJIT_JUMP)))
+            SCANCEL();
+
+        dest->sljitLabelReqs.push_back((void *) sj);
+    }
+#endif
+
+    return ret;
 }
 
 // 991
 Instruction *IRBuilder::createCondBr(
     Instruction *cond, BasicBlock *ifTrue, BasicBlock *ifFalse
 ) {
-#ifdef JITTEFEX_USE_SFJIT
-    abort();
-#endif
-    return insertionPoint->append(
+    Instruction *ret = insertionPoint->append(
         std::make_unique<BrInst>(insertionPoint, cond, ifTrue, ifFalse));
+
+#ifdef JITTEFEX_USE_SFJIT
+    SJ {
+        struct sljit_jump *tj, *fj;
+
+        if (!(tj = sljit_emit_cmp(sc, SLJIT_NOT_EQUAL,
+            cond->sljitLoc.reg, cond->sljitLoc.off, SLJIT_IMM, 0)))
+            SCANCEL();
+
+        if (!(fj = sljit_emit_jump(sc, SLJIT_JUMP)))
+            SCANCEL();
+
+        ifTrue->sljitLabelReqs.push_back((void *) tj);
+        ifFalse->sljitLabelReqs.push_back((void *) fj);
+    }
+#endif
+
+    return ret;
 }
 
 // 1208
@@ -314,6 +339,24 @@ Instruction *IRBuilder::createMul(
     return ret;
 }
 
+#ifdef JITTEFEX_USE_SFJIT
+static inline bool sfmath(
+    struct sljit_compiler *sc, const Type &type, sljit_s32 op,
+    const SLJITLocation &res, const SLJITLocation &l, const SLJITLocation &r
+) {
+    int stype = type.getSLJITType();
+    if (stype == SLJIT_ARG_TYPE_F32)
+        op |= SLJIT_32;
+    else if (stype != SLJIT_ARG_TYPE_F64)
+        return false;
+
+    if (sljit_emit_fop2(sc, op, res.reg, res.off, l.reg, l.off, r.reg, r.off))
+        return false;
+
+    return true;
+}
+#endif
+
 // 1423
 Instruction *IRBuilder::createFAdd(
     Instruction *l, Instruction *r, const std::string &name
@@ -326,28 +369,10 @@ Instruction *IRBuilder::createFAdd(
 
 #ifdef JITTEFEX_USE_SFJIT
     SJ {
-        int stype = l->getType().getSLJITType();
-        sljit_s32 op;
-
-        switch (stype) {
-            case SLJIT_ARG_TYPE_F64:
-                op = SLJIT_ADD_F64;
-                break;
-
-            case SLJIT_ARG_TYPE_F32:
-                op = SLJIT_ADD_F32;
-                break;
-
-            default:
-                SCANCEL();
-        }
-
         if (!f->sljitAllocateRegister(true, ret->sljitLoc))
             SCANCEL();
-
-        if (sljit_emit_fop2(sc, op, ret->sljitLoc.reg, ret->sljitLoc.off,
-            l->sljitLoc.reg, l->sljitLoc.off,
-            r->sljitLoc.reg, r->sljitLoc.off))
+        if (!sfmath(sc, l->getType(), SLJIT_ADD_F64, ret->sljitLoc, l->sljitLoc,
+            r->sljitLoc))
             SCANCEL();
     }
 #endif
@@ -359,14 +384,23 @@ Instruction *IRBuilder::createFAdd(
 Instruction *IRBuilder::createFSub(
     Instruction *l, Instruction *r, const std::string &name
 ) {
-#ifdef JITTEFEX_USE_SFJIT
-    abort();
-#endif
     // FIXME
     (void) name;
     assert(l->getType() == r->getType());
-    return insertionPoint->append(
+    Instruction *ret = insertionPoint->append(
         std::make_unique<BinaryInst>(insertionPoint, Opcode::FSub, l->getType(), l, r));
+
+#ifdef JITTEFEX_USE_SFJIT
+    SJ {
+        if (!f->sljitAllocateRegister(true, ret->sljitLoc))
+            SCANCEL();
+        if (!sfmath(sc, l->getType(), SLJIT_SUB_F64, ret->sljitLoc, l->sljitLoc,
+            r->sljitLoc))
+            SCANCEL();
+    }
+#endif
+
+    return ret;
 }
 
 // 1473
@@ -381,28 +415,10 @@ Instruction *IRBuilder::createFMul(
 
 #ifdef JITTEFEX_USE_SFJIT
     SJ {
-        int stype = l->getType().getSLJITType();
-        sljit_s32 op;
-
-        switch (stype) {
-            case SLJIT_ARG_TYPE_F64:
-                op = SLJIT_MUL_F64;
-                break;
-
-            case SLJIT_ARG_TYPE_F32:
-                op = SLJIT_MUL_F32;
-                break;
-
-            default:
-                SCANCEL();
-        }
-
         if (!f->sljitAllocateRegister(true, ret->sljitLoc))
             SCANCEL();
-
-        if (sljit_emit_fop2(sc, op, ret->sljitLoc.reg, ret->sljitLoc.off,
-            l->sljitLoc.reg, l->sljitLoc.off,
-            r->sljitLoc.reg, r->sljitLoc.off))
+        if (!sfmath(sc, l->getType(), SLJIT_MUL_F64, ret->sljitLoc, l->sljitLoc,
+            r->sljitLoc))
             SCANCEL();
     }
 #endif
@@ -650,14 +666,42 @@ Instruction *IRBuilder::createSExt(
 Instruction *IRBuilder::createUIToFP(
     Instruction *val, const Type &destTy, const std::string &name
 ) {
-#ifdef JITTEFEX_USE_SFJIT
-    abort();
-#endif
     // FIXME
     (void) name;
-    return insertionPoint->append(
+    Instruction *ret = insertionPoint->append(
         std::make_unique<CastInst>(insertionPoint, Opcode::UIToFP, val,
             destTy));
+
+#ifdef JITTEFEX_USE_SFJIT
+    SJ {
+        // FIXME: SLJIT has no unsigned versions of these!
+        int fromType = val->getType().getSLJITType();
+        int toType = destTy.getSLJITType();
+
+        if (!f->sljitAllocateRegister(true, ret->sljitLoc))
+            SCANCEL();
+
+        sljit_s32 op;
+        if (fromType == SLJIT_ARG_TYPE_32) {
+            if (toType == SLJIT_ARG_TYPE_F32)
+                op = SLJIT_CONV_F32_FROM_S32;
+            else
+                op = SLJIT_CONV_F64_FROM_S32;
+        } else {
+            if (toType == SLJIT_ARG_TYPE_F32)
+                op = SLJIT_CONV_F32_FROM_SW;
+            else
+                op = SLJIT_CONV_F64_FROM_SW;
+        }
+
+        if (sljit_emit_fop1(sc, op,
+            ret->sljitLoc.reg, ret->sljitLoc.off,
+            val->sljitLoc.reg, val->sljitLoc.off))
+            SCANCEL();
+    }
+#endif
+
+    return ret;
 }
 
 // 2231
@@ -690,34 +734,88 @@ Instruction *IRBuilder::createICmpSLT(
             true, false, true, false));
 }
 
+#ifdef JITTEFEX_USE_SFJIT
+// Utility function for SLJIT floating point comparisons
+static inline bool sfcmp(
+    struct sljit_compiler *sc, const Type &type, const SLJITLocation &res,
+    const SLJITLocation &l, const SLJITLocation &r, sljit_s32 *flags,
+    sljit_s32 *ops
+) {
+    sljit_s32 cmpOp = SLJIT_CMP_F64;
+    int stype = type.getSLJITType();
+    if (stype == SLJIT_ARG_TYPE_F32)
+        cmpOp |= SLJIT_32;
+    else if (stype != SLJIT_ARG_TYPE_F64)
+        return false;
+
+    for (int i = 0; flags[i]; i++) {
+        if (sljit_emit_fop1(sc, cmpOp | SLJIT_SET(flags[i]), l.reg, l.off,
+            r.reg, r.off))
+            return false;
+
+        if (sljit_emit_op_flags(sc, ops[i], SLJIT_R0, 0, flags[i]))
+            return false;
+    }
+
+    if (sljit_emit_op1(sc, SLJIT_MOV, res.reg, res.off, SLJIT_R0, 0))
+        return false;
+
+    return true;
+}
+#endif
+
 // 2292
 Instruction *IRBuilder::createFCmpONE(
     Instruction *l, Instruction *r, const std::string &name
 ) {
-#ifdef JITTEFEX_USE_SFJIT
-    abort();
-#endif
     // FIXME
     (void) name;
-    return insertionPoint->append(
+    assert(l->getType() == r->getType());
+    Instruction *ret = insertionPoint->append(
         std::make_unique<FCmpInst>(
             insertionPoint, l, r,
             true, true, true, false));
+
+#ifdef JITTEFEX_USE_SFJIT
+    SJ {
+        static sljit_s32 flags[] = {SLJIT_F_NOT_EQUAL, SLJIT_ORDERED, 0};
+        static sljit_s32 ops[] = {SLJIT_MOV, SLJIT_AND, 0};
+        if (!f->sljitAllocateRegister(false, ret->sljitLoc))
+            SCANCEL();
+        if (!sfcmp(sc, l->getType(), ret->sljitLoc, l->sljitLoc, r->sljitLoc,
+            flags, ops))
+            SCANCEL();
+    }
+#endif
+
+    return ret;
 }
 
 // 2322
 Instruction *IRBuilder::createFCmpULT(
     Instruction *l, Instruction *r, const std::string &name
 ) {
-#ifdef JITTEFEX_USE_SFJIT
-    abort();
-#endif
     // FIXME
     (void) name;
-    return insertionPoint->append(
+    assert(l->getType() == r->getType());
+    Instruction *ret = insertionPoint->append(
         std::make_unique<FCmpInst>(
             insertionPoint, l, r,
             false, false, true, false));
+
+#ifdef JITTEFEX_USE_SFJIT
+    SJ {
+        static sljit_s32 flags[] = {SLJIT_F_LESS, SLJIT_UNORDERED, 0};
+        static sljit_s32 ops[] = {SLJIT_MOV, SLJIT_OR, 0};
+        if (!f->sljitAllocateRegister(false, ret->sljitLoc))
+            SCANCEL();
+        if (!sfcmp(sc, l->getType(), ret->sljitLoc, l->sljitLoc, r->sljitLoc,
+            flags, ops))
+            SCANCEL();
+    }
+#endif
+
+    return ret;
 }
 
 // 2391
@@ -735,7 +833,7 @@ Instruction *IRBuilder::createCall(
     SJ {
         struct sljit_marg *marg;
         struct sljit_alloca *alloc;
-        SLJITLocation loc;
+        SLJITLocation loc, floc;
         sljit_s32 wordR, floatR, stackSpace,
             argI, wordI, floatI, stackI;
         std::unordered_map<sljit_s32, SLJITLocation> regMap;
@@ -779,17 +877,24 @@ Instruction *IRBuilder::createCall(
             ret->sljitLoc))
             SCANCEL();
 
-        // Compile the function
-        if (sljit_emit_op1(sc, SLJIT_MOV_P, SLJIT_R0, 0,
-            callee->sljitLoc.reg, callee->sljitLoc.off))
-            SCANCEL();
-        if (sljit_emit_icall(sc, SLJIT_CALL, SLJIT_ARGS1(P, P),
-            SLJIT_IMM, (sljit_sw) (void *) jittefex::compile))
-            SCANCEL();
-        if (sljit_emit_op1(sc, SLJIT_MOV_P,
-            SLJIT_S(SLJIT_NUMBER_OF_SAVED_REGISTERS), 0,
-            SLJIT_R0, 0))
-            SCANCEL();
+        // Compile the function if applicable
+        if (callee->getType().getBaseType() == BaseType::Pointer) {
+            if (sljit_emit_op1(sc, SLJIT_MOV_P, SLJIT_R0, 0,
+                callee->sljitLoc.reg, callee->sljitLoc.off))
+                SCANCEL();
+            if (sljit_emit_icall(sc, SLJIT_CALL, SLJIT_ARGS1(P, P),
+                SLJIT_IMM, (sljit_sw) (void *) jittefex::compile))
+                SCANCEL();
+            if (sljit_emit_op1(sc, SLJIT_MOV_P,
+                SLJIT_S(SLJIT_NUMBER_OF_SAVED_REGISTERS), 0,
+                SLJIT_R0, 0))
+                SCANCEL();
+            floc = SLJITLocation{SLJIT_S(SLJIT_NUMBER_OF_SAVED_REGISTERS), 0};
+
+        } else { // CodePointer
+            floc = callee->sljitLoc;
+
+        }
 
         // Figure out how many arguments we need
         if (sljit_marg_properties(sc, marg, &wordR, &floatR, &stackSpace))
@@ -875,8 +980,7 @@ Instruction *IRBuilder::createCall(
         }
 
         // Call the actual function
-        if (sljit_emit_icall_multiarg(sc, marg,
-            SLJIT_S(SLJIT_NUMBER_OF_SAVED_REGISTERS), 0))
+        if (sljit_emit_icall_multiarg(sc, marg, floc.reg, floc.off))
             SCANCEL();
 
         if (stackSpace && sljit_emit_pop(sc, alloc->size))
@@ -949,36 +1053,7 @@ Instruction *IRBuilder::createIntLiteral(const Type &ty, long long val) {
 
 #ifdef JITTEFEX_USE_SFJIT
     SJ {
-        int stype;
-        sljit_s32 op;
-
-        stype = ty.getSLJITType();
-        if (stype < 0)
-            SCANCEL();
-
-        if (!f->sljitAllocateRegister(false, ret->sljitLoc))
-            SCANCEL();
-
-        switch (stype) {
-            case SLJIT_ARG_TYPE_W:
-                op = SLJIT_MOV;
-                break;
-
-            case SLJIT_ARG_TYPE_32:
-                op = SLJIT_MOV32;
-                break;
-
-            case SLJIT_ARG_TYPE_P:
-                op = SLJIT_MOV_P;
-                break;
-
-            default:
-                SCANCEL();
-        }
-
-        if (sljit_emit_op1(sc, op, ret->sljitLoc.reg, ret->sljitLoc.off,
-            SLJIT_IMM, (sljit_sw) val))
-            SCANCEL();
+        ret->sljitLoc = SLJITLocation{SLJIT_IMM, (ptrdiff_t) val};
     }
 #endif
 
@@ -1048,13 +1123,20 @@ Instruction *IRBuilder::createFuncLiteral(Function *val) {
 
 #ifdef JITTEFEX_USE_SFJIT
     SJ {
-        if (!f->sljitAllocateRegister(false, ret->sljitLoc))
-            SCANCEL();
+        ret->sljitLoc = SLJITLocation{SLJIT_IMM, (ptrdiff_t) (void *) val};
+    }
+#endif
 
-        if (sljit_emit_op1(sc, SLJIT_MOV_P,
-            ret->sljitLoc.reg, ret->sljitLoc.off,
-            SLJIT_IMM, (sljit_sw) (void *) val))
-            SCANCEL();
+    return ret;
+}
+
+Instruction *IRBuilder::createCodeLiteral(void *val) {
+    Instruction *ret = insertionPoint->append(
+        std::make_unique<CodeLiteralInst>(insertionPoint, val));
+
+#ifdef JITTEFEX_USE_SFJIT
+    SJ {
+        ret->sljitLoc = SLJITLocation{SLJIT_IMM, (ptrdiff_t) val};
     }
 #endif
 

@@ -45,12 +45,25 @@ void *Function::compile() {
         struct sljit_compiler *sc = (struct sljit_compiler *) sljitCompiler;
 
         // Fill the local space alloca
-        if (!sljit_set_alloca(sc, (struct sljit_alloca *) sljitAlloca,
-            sljitStack.size() * sizeof(sljit_f64))) {
-            sljitCode = sljit_generate_code(sc);
+        if (sljit_set_alloca(sc, (struct sljit_alloca *) sljitAlloca,
+            sljitStack.size() * sizeof(sljit_f64)))
+            sc = nullptr;
+
+        // Handle all labels
+        if (sc) {
+            for (auto &b : blocks) {
+                struct sljit_label *l = (struct sljit_label *) b->sljitLabel;
+                for (auto *vj : b->sljitLabelReqs) {
+                    sljit_set_label((struct sljit_jump *) vj, l);
+                }
+            }
         }
 
-        sljit_free_compiler(sc);
+        // Then generate code
+        if (sc)
+            sljitCode = sljit_generate_code(sc);
+
+        sljit_free_compiler((struct sljit_compiler *) sljitCompiler);
         sljitCompiler = nullptr;
     }
 

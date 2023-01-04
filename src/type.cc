@@ -29,6 +29,7 @@ llvm::Type *Type::getLLVMType(llvm::LLVMContext &context) const {
                 abort();
 
         case BaseType::Pointer:
+        case BaseType::CodePointer:
             return llvm::Type::getVoidTy(context)->getPointerTo();
 
         default:
@@ -42,6 +43,8 @@ int Type::getSLJITType() const {
     switch (baseType) {
         case BaseType::Signed:
         case BaseType::Unsigned:
+        case BaseType::Pointer:
+        case BaseType::CodePointer:
 #if (defined SLJIT_64BIT_ARCHITECTURE && SLJIT_64BIT_ARCHITECTURE)
             if (width == 8)
                 return SLJIT_ARG_TYPE_W;

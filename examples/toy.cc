@@ -19,14 +19,32 @@
 #include <algorithm>
 #include <cassert>
 #include <cctype>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <iostream>
 #include <map>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
+
+//===----------------------------------------------------------------------===//
+// "Library" functions that can be "extern'd" from user code.
+//===----------------------------------------------------------------------===//
+
+/// putchard - putchar that takes a double and returns 0.
+extern "C" double putchard(double X) {
+  fputc((char)X, stderr);
+  return 0;
+}
+
+/// printd - printf that takes a double prints it as "%f\n", returning 0.
+extern "C" double printd(double X) {
+  fprintf(stderr, "%f\n", X);
+  return 0;
+}
 
 //===----------------------------------------------------------------------===//
 // Lexer
@@ -39,11 +57,11 @@ enum Token {
 
   // commands
   tok_def = -2,
-  tok_extern = -3,
 
   // primary
   tok_identifier = -4,
   tok_number = -5,
+  tok_exref = -20,
 
   // control
   tok_if = -6,
@@ -62,6 +80,7 @@ enum Token {
 
 static std::string IdentifierStr; // Filled in if tok_identifier
 static double NumVal;             // Filled in if tok_number
+static void *ExRefVal;            // Filled in if tok_exref
 
 /// gettok - Return the next token from standard input.
 static int gettok() {
@@ -71,15 +90,13 @@ static int gettok() {
   while (isspace(LastChar))
     LastChar = getchar();
 
-  if (isalpha(LastChar)) { // identifier: [a-zA-Z][a-zA-Z0-9]*
+  if (isalpha(LastChar) || LastChar == '@') { // identifier: [a-zA-Z][a-zA-Z0-9]*
     IdentifierStr = LastChar;
     while (isalnum((LastChar = getchar())))
       IdentifierStr += LastChar;
 
     if (IdentifierStr == "def")
       return tok_def;
-    if (IdentifierStr == "extern")
-      return tok_extern;
     if (IdentifierStr == "if")
       return tok_if;
     if (IdentifierStr == "then")
@@ -96,6 +113,23 @@ static int gettok() {
       return tok_unary;
     if (IdentifierStr == "var")
       return tok_var;
+    if (IdentifierStr[0] == '@') {
+      if (IdentifierStr == "@putchard") {
+        ExRefVal = (void *) putchard;
+      } else if (IdentifierStr == "@printd") {
+        ExRefVal = (void *) printd;
+      } else if (IdentifierStr == "@sin") {
+        ExRefVal = (void *) sin;
+      } else if (IdentifierStr == "@cos") {
+        ExRefVal = (void *) cos;
+      } else if (IdentifierStr == "@atan2") {
+        ExRefVal = (void *) atan2;
+      } else {
+        std::cerr << "Unrecognized extern " << IdentifierStr << std::endl;
+        exit(1);
+      }
+      return tok_exref;
+    }
     return tok_identifier;
   }
 
@@ -197,6 +231,19 @@ class CallExprAST : public ExprAST {
 
 public:
   CallExprAST(const std::string &Callee,
+              std::vector<std::unique_ptr<ExprAST>> Args)
+      : Callee(Callee), Args(std::move(Args)) {}
+
+  jittefex::Instruction *codegen() override;
+};
+
+/// ExternCallExprAST - Expression class for extern function calls.
+class ExternCallExprAST : public ExprAST {
+  void *Callee;
+  std::vector<std::unique_ptr<ExprAST>> Args;
+
+public:
+  ExternCallExprAST(void *Callee,
               std::vector<std::unique_ptr<ExprAST>> Args)
       : Callee(Callee), Args(std::move(Args)) {}
 
@@ -346,6 +393,41 @@ static std::unique_ptr<ExprAST> ParseParenExpr() {
     return LogError("expected ')'");
   getNextToken(); // eat ).
   return V;
+}
+
+/// externrefexpr
+///   ::= identifier '(' expression* ')'
+static std::unique_ptr<ExprAST> ParseExternExpr() {
+  void *ExRef = ExRefVal;
+
+  getNextToken(); // eat identifier.
+
+  if (CurTok != '(') // Simple variable ref.
+    return LogError("expected '('");
+
+  // External call
+  getNextToken(); // eat (
+  std::vector<std::unique_ptr<ExprAST>> Args;
+  if (CurTok != ')') {
+    while (true) {
+      if (auto Arg = ParseExpression())
+        Args.push_back(std::move(Arg));
+      else
+        return nullptr;
+
+      if (CurTok == ')')
+        break;
+
+      if (CurTok != ',')
+        return LogError("Expected ')' or ',' in argument list");
+      getNextToken();
+    }
+  }
+
+  // Eat the ')'.
+  getNextToken();
+
+  return std::make_unique<ExternCallExprAST>(ExRefVal, std::move(Args));
 }
 
 /// identifierexpr
@@ -521,6 +603,8 @@ static std::unique_ptr<ExprAST> ParsePrimary() {
     return LogError("unknown token when expecting an expression");
   case tok_identifier:
     return ParseIdentifierExpr();
+  case tok_exref:
+    return ParseExternExpr();
   case tok_number:
     return ParseNumberExpr();
   case '(':
@@ -687,12 +771,6 @@ static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
   return nullptr;
 }
 
-/// external ::= 'extern' prototype
-static std::unique_ptr<PrototypeAST> ParseExtern() {
-  getNextToken(); // eat extern.
-  return ParsePrototype();
-}
-
 //===----------------------------------------------------------------------===//
 // Code Generation
 //===----------------------------------------------------------------------===//
@@ -831,6 +909,28 @@ jittefex::Instruction *BinaryExprAST::codegen() {
   ret = Builder->createCall(F->getFunctionType(), FI, Ops, "binop");
   Builder->release(L);
   Builder->release(R);
+  Builder->release(FI);
+  return ret;
+}
+
+jittefex::Instruction *ExternCallExprAST::codegen() {
+  std::vector<jittefex::Instruction *> ArgsV;
+  for (unsigned i = 0, e = Args.size(); i != e; ++i) {
+    ArgsV.push_back(Args[i]->codegen());
+    if (!ArgsV.back())
+      return nullptr;
+  }
+
+  // Make the function type:  double(double,double) etc.
+  std::vector<jittefex::Type> Doubles(ArgsV.size(), jittefex::Type::floatType(8));
+  jittefex::FunctionType *FT =
+      jittefex::FunctionType::get(jittefex::Type::floatType(8), Doubles, false);
+
+  jittefex::Instruction *FI = Builder->createCodeLiteral(Callee);
+
+  jittefex::Instruction *ret = Builder->createCall(FT, FI, ArgsV, "calltmp");
+  for (auto *arg : ArgsV)
+    Builder->release(arg);
   Builder->release(FI);
   return ret;
 }
@@ -1189,22 +1289,6 @@ static void HandleDefinition() {
   }
 }
 
-static void HandleExtern() {
-  if (auto ProtoAST = ParseExtern()) {
-    if (auto *FnIR = ProtoAST->codegen()) {
-      fprintf(stderr, "Read extern: ");
-#if 0
-      FnIR->getLLVMFunction()->print(llvm::errs());
-#endif
-      fprintf(stderr, "\n");
-      FunctionProtos[ProtoAST->getName()] = std::move(ProtoAST);
-    }
-  } else {
-    // Skip token for error recovery.
-    getNextToken();
-  }
-}
-
 static void HandleTopLevelExpression() {
   // Evaluate a top-level expression into an anonymous function.
   if (auto FnAST = ParseTopLevelExpr()) {
@@ -1232,7 +1316,8 @@ static void HandleTopLevelExpression() {
       double (*f)();
       f = (double(*)()) F->compile();
       fprintf(stderr, "Evaluated to %f\n", f());
-      InitializeModule();
+      //InitializeModule();
+      F->eraseFromParent();
     }
   } else {
     // Skip token for error recovery.
@@ -1240,7 +1325,7 @@ static void HandleTopLevelExpression() {
   }
 }
 
-/// top ::= definition | external | expression | ';'
+/// top ::= definition | expression | ';'
 static void MainLoop() {
   while (true) {
     fprintf(stderr, "ready> ");
@@ -1253,30 +1338,11 @@ static void MainLoop() {
     case tok_def:
       HandleDefinition();
       break;
-    case tok_extern:
-      HandleExtern();
-      break;
     default:
       HandleTopLevelExpression();
       break;
     }
   }
-}
-
-//===----------------------------------------------------------------------===//
-// "Library" functions that can be "extern'd" from user code.
-//===----------------------------------------------------------------------===//
-
-/// putchard - putchar that takes a double and returns 0.
-extern "C" double putchard(double X) {
-  fputc((char)X, stderr);
-  return 0;
-}
-
-/// printd - printf that takes a double prints it as "%f\n", returning 0.
-extern "C" double printd(double X) {
-  fprintf(stderr, "%f\n", X);
-  return 0;
 }
 
 //===----------------------------------------------------------------------===//

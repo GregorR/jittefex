@@ -7,7 +7,7 @@
 #include "type.h"
 
 #include <cstdarg>
-#include <queue>
+#include <list>
 #include <unordered_map>
 #include <vector>
 
@@ -28,8 +28,8 @@ class BasicBlock {
         friend class IRBuilder;
 
 #ifdef JITTEFEX_HAVE_SFJIT
-        void *sljitLabel = NULL; // Label for this basic block
-        std::queue<void *> sljitLabelReqs; // Things needing this label
+        void *sljitLabel = nullptr; // Label for this basic block
+        std::list<void *> sljitLabelReqs; // Things needing this label
 #endif
 
     private:

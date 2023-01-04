@@ -157,6 +157,8 @@ class IRBuilder {
         Instruction *createFltLiteral(const Type &ty, double val);
 
         Instruction *createFuncLiteral(Function *val);
+
+        Instruction *createCodeLiteral(void *val);
 };
 
 }
