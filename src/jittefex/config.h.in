@@ -4,4 +4,7 @@
 @JITTEFEX_HAVE_LLVM@
 @JITTEFEX_HAVE_SFJIT@
 
+// FIXME: Make this configurable
+#define JITTEFEX_ENABLE_DEBUG 1
+
 #endif

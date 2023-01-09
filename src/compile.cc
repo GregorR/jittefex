@@ -182,6 +182,12 @@ llvm::Expected<llvm::Value *> toLLVM(
 ) {
     llvm::LLVMContext &context = builder.getContext();
 
+#ifdef JITTEFEX_ENABLE_DEBUG
+#define NAME , instr->getName()
+#else
+#define NAME
+#endif
+
     switch (instr->getOpcode()) {
         case Opcode::Ret: // 1
         {
@@ -204,25 +210,25 @@ llvm::Expected<llvm::Value *> toLLVM(
         case Opcode::FAdd: // 14
         {
             auto i = (BinaryInst *) instr;
-            return builder.CreateFAdd(ic(i->getL()), ic(i->getR()));
+            return builder.CreateFAdd(ic(i->getL()), ic(i->getR()) NAME);
         }
 
         case Opcode::FSub: // 16
         {
             auto i = (BinaryInst *) instr;
-            return builder.CreateFSub(ic(i->getL()), ic(i->getR()));
+            return builder.CreateFSub(ic(i->getL()), ic(i->getR()) NAME);
         }
 
         case Opcode::Mul: // 17
         {
             auto i = (BinaryInst *) instr;
-            return builder.CreateMul(ic(i->getL()), ic(i->getR()));
+            return builder.CreateMul(ic(i->getL()), ic(i->getR()) NAME);
         }
 
         case Opcode::FMul: // 18
         {
             auto i = (BinaryInst *) instr;
-            return builder.CreateFMul(ic(i->getL()), ic(i->getR()));
+            return builder.CreateFMul(ic(i->getL()), ic(i->getR()) NAME);
         }
 
         case Opcode::Alloca: // 31
@@ -233,7 +239,7 @@ llvm::Expected<llvm::Value *> toLLVM(
             if (arraySize)
                 lArraySize = ic(arraySize);
             return builder.CreateAlloca(
-                i->getAllocaType().getLLVMType(context), lArraySize);
+                i->getAllocaType().getLLVMType(context), lArraySize NAME);
         }
 
         case Opcode::Load: // 32
@@ -241,7 +247,7 @@ llvm::Expected<llvm::Value *> toLLVM(
             auto i = (LoadInst *) instr;
             return builder.CreateLoad(
                 i->getType().getLLVMType(context),
-                ic(i->getPtr())
+                ic(i->getPtr()) NAME
             );
         }
 
@@ -255,7 +261,7 @@ llvm::Expected<llvm::Value *> toLLVM(
         {
             auto i = (CastInst *) instr;
             return builder.CreateUIToFP(ic(i->getS()),
-                i->getType().getLLVMType(context));
+                i->getType().getLLVMType(context) NAME);
         }
 
         case Opcode::FCmp: // 54
@@ -266,7 +272,7 @@ llvm::Expected<llvm::Value *> toLLVM(
                  eq = i->getEq(),
                  ord = i->getOrdered();
 #define F(which) do { \
-    return builder.CreateFCmp ## which(ic(i->getL()), ic(i->getR())); \
+    return builder.CreateFCmp ## which(ic(i->getL()), ic(i->getR()) NAME); \
 } while (0)
             if (gt) {
                 if (lt) {
@@ -369,7 +375,7 @@ llvm::Expected<llvm::Value *> toLLVM(
                 args.push_back(ic(a));
 
             // Call it
-            return builder.CreateCall(calleeType, callee, args);
+            return builder.CreateCall(calleeType, callee, args NAME);
         }
 
         case Opcode::Arg: // 1101
@@ -437,6 +443,8 @@ llvm::Expected<llvm::Value *> toLLVM(
                 "Unsupported opcode %d", instr->getOpcode()
             );
     }
+
+#undef NAME
 }
 #endif
 

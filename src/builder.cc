@@ -15,10 +15,15 @@
 
 #include <cassert>
 
-#ifdef DEBUG
-#include <iostream>
+#ifdef JITTEFEX_HAVE_LLVM
+#ifdef JITTEFEX_ENABLE_DEBUG
+#define NAME , name
+#else
+#define NAME
+#endif
 #endif
 
+#ifdef JITTEFEX_HAVE_SFJIT
 #define SJ \
     Function *f = insertionPoint->parent; \
     struct sljit_compiler *sc = (struct sljit_compiler *) f->sljitCompiler; \
@@ -27,31 +32,13 @@
     insertionPoint->parent->cancelSLJIT(); \
     return ret; \
 } while (0)
+#endif
 
 namespace jittefex {
 
 void IRBuilder::setInsertPoint(BasicBlock *to)
 {
 #ifdef JITTEFEX_USE_SFJIT
-#ifdef DEBUG
-    if (insertionPoint) {
-        /* Make sure that all instructions in the current block have been
-         * released */
-        for (auto &inst : insertionPoint->getInstructions()) {
-            if (inst->getOpcode() == Opcode::Alloca) {
-                // Allocas don't need to be released
-                continue;
-            }
-            if (inst->sljitLoc.reg >= 0) {
-                std::cerr << "Instruction of type " <<
-                    inst->getOpcode() <<
-                    " unreleased!" << std::endl;
-                abort();
-            }
-        }
-    }
-#endif
-
     Function *f = to->parent;
     if (f->sljitCompiler) {
         struct sljit_compiler *sc = (struct sljit_compiler *)
@@ -252,12 +239,11 @@ Instruction *IRBuilder::createCondBr(
 Instruction *IRBuilder::createAdd(
     Instruction *l, Instruction *r, const std::string &name
 ) {
-    // FIXME
     (void) name;
     assert(l->getType() == r->getType());
     Instruction *ret = insertionPoint->append(
         std::make_unique<BinaryInst>(insertionPoint, Opcode::Add, l->getType(),
-            l, r)
+            l, r NAME)
     );
 
 #ifdef JITTEFEX_USE_SFJIT
@@ -286,12 +272,11 @@ Instruction *IRBuilder::createSub(
 #ifdef JITTEFEX_USE_SFJIT
     abort();
 #endif
-    // FIXME
     (void) name;
     assert(l->getType() == r->getType());
     return insertionPoint->append(
         std::make_unique<BinaryInst>(insertionPoint, Opcode::Sub, l->getType(),
-            l, r)
+            l, r NAME)
     );
 }
 
@@ -299,12 +284,11 @@ Instruction *IRBuilder::createSub(
 Instruction *IRBuilder::createMul(
     Instruction *l, Instruction *r, const std::string &name
 ) {
-    // FIXME
     (void) name;
     assert(l->getType() == r->getType());
     Instruction *ret = insertionPoint->append(
         std::make_unique<BinaryInst>(insertionPoint, Opcode::Mul, l->getType(),
-            l, r)
+            l, r NAME)
     );
 
 #ifdef JITTEFEX_USE_SFJIT
@@ -361,11 +345,11 @@ static inline bool sfmath(
 Instruction *IRBuilder::createFAdd(
     Instruction *l, Instruction *r, const std::string &name
 ) {
-    // FIXME
     (void) name;
     assert(l->getType() == r->getType());
     Instruction *ret = insertionPoint->append(
-        std::make_unique<BinaryInst>(insertionPoint, Opcode::FAdd, l->getType(), l, r));
+        std::make_unique<BinaryInst>(
+            insertionPoint, Opcode::FAdd, l->getType(), l, r NAME));
 
 #ifdef JITTEFEX_USE_SFJIT
     SJ {
@@ -384,11 +368,11 @@ Instruction *IRBuilder::createFAdd(
 Instruction *IRBuilder::createFSub(
     Instruction *l, Instruction *r, const std::string &name
 ) {
-    // FIXME
     (void) name;
     assert(l->getType() == r->getType());
     Instruction *ret = insertionPoint->append(
-        std::make_unique<BinaryInst>(insertionPoint, Opcode::FSub, l->getType(), l, r));
+        std::make_unique<BinaryInst>(
+            insertionPoint, Opcode::FSub, l->getType(), l, r NAME));
 
 #ifdef JITTEFEX_USE_SFJIT
     SJ {
@@ -407,11 +391,11 @@ Instruction *IRBuilder::createFSub(
 Instruction *IRBuilder::createFMul(
     Instruction *l, Instruction *r, const std::string &name
 ) {
-    // FIXME
     (void) name;
     assert(l->getType() == r->getType());
     Instruction *ret = insertionPoint->append(
-        std::make_unique<BinaryInst>(insertionPoint, Opcode::FMul, l->getType(), l, r));
+        std::make_unique<BinaryInst>(
+            insertionPoint, Opcode::FMul, l->getType(), l, r NAME));
 
 #ifdef JITTEFEX_USE_SFJIT
     SJ {
@@ -431,10 +415,9 @@ Instruction *IRBuilder::createAlloca(
     const Type &ty, Instruction *arraySize,
     const std::string &name
 ) {
-    // FIXME
     (void) name;
     Instruction *ret = insertionPoint->append(
-        std::make_unique<AllocaInst>(insertionPoint, ty, arraySize));
+        std::make_unique<AllocaInst>(insertionPoint, ty, arraySize NAME));
 
 #ifdef JITTEFEX_USE_SFJIT
     SJ {
@@ -469,8 +452,8 @@ Instruction *IRBuilder::createLoad(
     (void) isVolatile;
     (void) name;
     Instruction *ret =
-        insertionPoint->append(std::make_unique<LoadInst>(insertionPoint, ty,
-            ptr));
+        insertionPoint->append(std::make_unique<LoadInst>(
+            insertionPoint, ty, ptr NAME));
 
 #ifdef JITTEFEX_USE_SFJIT
     SJ {
@@ -630,10 +613,9 @@ Instruction *IRBuilder::createTrunc(
 #ifdef JITTEFEX_USE_SFJIT
     abort();
 #endif
-    // FIXME
     (void) name;
     return insertionPoint->append(
-        std::make_unique<CastInst>(insertionPoint, Opcode::Trunc, v, destTy));
+        std::make_unique<CastInst>(insertionPoint, Opcode::Trunc, v, destTy NAME));
 }
 
 // 2021
@@ -643,10 +625,9 @@ Instruction *IRBuilder::createZExt(
 #ifdef JITTEFEX_USE_SFJIT
     abort();
 #endif
-    // FIXME
     (void) name;
     return insertionPoint->append(
-        std::make_unique<CastInst>(insertionPoint, Opcode::ZExt, v, destTy));
+        std::make_unique<CastInst>(insertionPoint, Opcode::ZExt, v, destTy NAME));
 }
 
 // 2025
@@ -656,21 +637,18 @@ Instruction *IRBuilder::createSExt(
 #ifdef JITTEFEX_USE_SFJIT
     abort();
 #endif
-    // FIXME
     (void) name;
     return insertionPoint->append(
-        std::make_unique<CastInst>(insertionPoint, Opcode::SExt, v, destTy));
+        std::make_unique<CastInst>(insertionPoint, Opcode::SExt, v, destTy NAME));
 }
 
 // 2073
 Instruction *IRBuilder::createUIToFP(
     Instruction *val, const Type &destTy, const std::string &name
 ) {
-    // FIXME
     (void) name;
-    Instruction *ret = insertionPoint->append(
-        std::make_unique<CastInst>(insertionPoint, Opcode::UIToFP, val,
-            destTy));
+    Instruction *ret = insertionPoint->append(std::make_unique<CastInst>(
+        insertionPoint, Opcode::UIToFP, val, destTy NAME));
 
 #ifdef JITTEFEX_USE_SFJIT
     SJ {
@@ -711,12 +689,11 @@ Instruction *IRBuilder::createICmpNE(
 #ifdef JITTEFEX_USE_SFJIT
     abort();
 #endif
-    // FIXME
     (void) name;
     return insertionPoint->append(
         std::make_unique<ICmpInst>(
             insertionPoint, l, r,
-            false, true, true, false));
+            false, true, true, false NAME));
 }
 
 // 2259
@@ -726,12 +703,11 @@ Instruction *IRBuilder::createICmpSLT(
 #ifdef JITTEFEX_USE_SFJIT
     abort();
 #endif
-    // FIXME
     (void) name;
     return insertionPoint->append(
         std::make_unique<ICmpInst>(
             insertionPoint, l, r,
-            true, false, true, false));
+            true, false, true, false NAME));
 }
 
 #ifdef JITTEFEX_USE_SFJIT
@@ -768,13 +744,12 @@ static inline bool sfcmp(
 Instruction *IRBuilder::createFCmpONE(
     Instruction *l, Instruction *r, const std::string &name
 ) {
-    // FIXME
     (void) name;
     assert(l->getType() == r->getType());
     Instruction *ret = insertionPoint->append(
         std::make_unique<FCmpInst>(
             insertionPoint, l, r,
-            true, true, true, false));
+            true, true, true, false NAME));
 
 #ifdef JITTEFEX_USE_SFJIT
     SJ {
@@ -795,13 +770,12 @@ Instruction *IRBuilder::createFCmpONE(
 Instruction *IRBuilder::createFCmpULT(
     Instruction *l, Instruction *r, const std::string &name
 ) {
-    // FIXME
     (void) name;
     assert(l->getType() == r->getType());
     Instruction *ret = insertionPoint->append(
         std::make_unique<FCmpInst>(
             insertionPoint, l, r,
-            false, false, true, false));
+            false, false, true, false NAME));
 
 #ifdef JITTEFEX_USE_SFJIT
     SJ {
@@ -824,10 +798,9 @@ Instruction *IRBuilder::createCall(
     const std::vector<Instruction *> &args,
     const std::string &name
 ) {
-    // FIXME
     (void) name;
     Instruction *ret = insertionPoint->append(
-        std::make_unique<CallInst>(insertionPoint, fTy, callee, args));
+        std::make_unique<CallInst>(insertionPoint, fTy, callee, args NAME));
 
 #ifdef JITTEFEX_USE_SFJIT
     SJ {

@@ -98,16 +98,37 @@ class Instruction {
         BasicBlock *parent;
         Opcode opcode;
         Type type;
+#ifdef JITTEFEX_ENABLE_DEBUG
+        std::string name;
+#endif
 
     public:
-        inline Instruction(BasicBlock *parent, Opcode opcode, const Type &type)
+        inline Instruction(BasicBlock *parent, Opcode opcode, const Type &type
+#ifdef JITTEFEX_ENABLE_DEBUG
+            , const std::string name = ""
+#endif
+        )
             : parent{parent}, opcode{opcode}, type{type}
+#ifdef JITTEFEX_ENABLE_DEBUG
+            , name{name}
+#endif
             {}
 
         J_GETTERS(BasicBlock *, Parent, parent)
         J_GETTERS(Opcode, Opcode, opcode)
         J_GETTERS(Type, Type, type)
+#ifdef JITTEFEX_ENABLE_DEBUG
+        J_GETTERS(std::string, Name, name)
+#endif
 };
+
+#ifdef JITTEFEX_ENABLE_DEBUG
+#define J_NAME_P , const std::string name = ""
+#define J_NAME_A , name
+#else
+#define J_NAME_P
+#define J_NAME_A
+#endif
 
 /**
  * Return instruction.
@@ -117,8 +138,8 @@ class RetInst : public Instruction {
         Instruction *value;
 
     public:
-        inline RetInst(BasicBlock *parent, Instruction *value)
-            : Instruction(parent, Opcode::Ret, Type::voidType())
+        inline RetInst(BasicBlock *parent, Instruction *value J_NAME_P)
+            : Instruction(parent, Opcode::Ret, Type::voidType() J_NAME_A)
             , value{value}
             {}
 
@@ -137,17 +158,17 @@ class BrInst : public Instruction {
     public:
         inline BrInst(
             BasicBlock *parent, Instruction *condition,
-            BasicBlock *thenBlock,
-            BasicBlock *elseBlock
+            BasicBlock *thenBlock, BasicBlock *elseBlock
+            J_NAME_P
         )
-            : Instruction(parent, Opcode::Br, Type::voidType())
+            : Instruction(parent, Opcode::Br, Type::voidType() J_NAME_A)
             , condition{condition}
             , thenBlock{thenBlock}
             , elseBlock{elseBlock}
             {}
 
-        inline BrInst(BasicBlock *parent, BasicBlock *target)
-            : Instruction(parent, Opcode::Br, Type::voidType())
+        inline BrInst(BasicBlock *parent, BasicBlock *target J_NAME_P)
+            : Instruction(parent, Opcode::Br, Type::voidType() J_NAME_A)
             , condition{nullptr}
             , thenBlock{target}
             , elseBlock{nullptr}
@@ -167,9 +188,9 @@ class UnaryInst : public Instruction {
 
     public:
         inline UnaryInst(
-            BasicBlock *parent, Opcode opcode, const Type &type, Instruction *s
+            BasicBlock *parent, Opcode opcode, const Type &type, Instruction *s J_NAME_P
         )
-            : Instruction(parent, opcode, type)
+            : Instruction(parent, opcode, type J_NAME_A)
             , s{s}
             {}
 
@@ -186,9 +207,9 @@ class BinaryInst : public Instruction {
     public:
         inline BinaryInst(
             BasicBlock *parent, Opcode opcode, const Type &type, Instruction *l,
-            Instruction *r
+            Instruction *r J_NAME_P
         )
-            : Instruction(parent, opcode, type)
+            : Instruction(parent, opcode, type J_NAME_A)
             , l{l}
             , r{r}
             {}
@@ -208,9 +229,9 @@ class AllocaInst : public Instruction {
     public:
         inline AllocaInst(
             BasicBlock *parent, const Type &type,
-            Instruction *arraySize = nullptr
+            Instruction *arraySize = nullptr J_NAME_P
         )
-            : Instruction(parent, Opcode::Alloca, Type::pointerType())
+            : Instruction(parent, Opcode::Alloca, Type::pointerType() J_NAME_A)
             , allocaType{type}
             , arraySize{arraySize}
             {}
@@ -227,8 +248,10 @@ class LoadInst : public Instruction {
         Instruction *ptr;
 
     public:
-        inline LoadInst(BasicBlock *parent, const Type &type, Instruction *ptr)
-            : Instruction(parent, Opcode::Load, type)
+        inline LoadInst(
+            BasicBlock *parent, const Type &type, Instruction *ptr J_NAME_P
+        )
+            : Instruction(parent, Opcode::Load, type J_NAME_A)
             , ptr{ptr}
             {}
 
@@ -245,9 +268,9 @@ class StoreInst : public Instruction {
 
     public:
         inline StoreInst(
-            BasicBlock *parent, Instruction *val, Instruction *ptr
+            BasicBlock *parent, Instruction *val, Instruction *ptr J_NAME_P
         )
-            : Instruction(parent, Opcode::Store, Type::voidType())
+            : Instruction(parent, Opcode::Store, Type::voidType() J_NAME_A)
             , val{val}
             , ptr{ptr}
             {}
@@ -263,9 +286,9 @@ class CastInst : public UnaryInst {
     public:
         inline CastInst(
             BasicBlock *parent, Opcode opcode, Instruction *val,
-            const Type &destTy
+            const Type &destTy J_NAME_P
         )
-            : UnaryInst(parent, opcode, destTy, val)
+            : UnaryInst(parent, opcode, destTy, val J_NAME_A)
             {}
 };
 
@@ -280,9 +303,9 @@ class CmpInst : public BinaryInst {
     public:
         inline CmpInst(
             BasicBlock *parent, Opcode opcode, Instruction *l, Instruction *r,
-            bool gt, bool lt, bool eq
+            bool gt, bool lt, bool eq J_NAME_P
         )
-            : BinaryInst(parent, opcode, Type::signedType(1), l, r)
+            : BinaryInst(parent, opcode, Type::signedType(1), l, r J_NAME_A)
             , gt{gt}
             , lt{lt}
             , eq{eq}
@@ -303,9 +326,9 @@ class ICmpInst : public CmpInst {
     public:
         inline ICmpInst(
             BasicBlock *parent, Instruction *l, Instruction *r, bool signd,
-            bool gt, bool lt, bool eq
+            bool gt, bool lt, bool eq J_NAME_P
         )
-            : CmpInst(parent, Opcode::ICmp, l, r, gt, lt, eq)
+            : CmpInst(parent, Opcode::ICmp, l, r, gt, lt, eq J_NAME_A)
             , signd{signd}
             {}
 
@@ -324,9 +347,9 @@ class FCmpInst : public CmpInst {
     public:
         inline FCmpInst(
             BasicBlock *parent, Instruction *l, Instruction *r, bool ordered,
-            bool gt, bool lt, bool eq
+            bool gt, bool lt, bool eq J_NAME_P
         )
-            : CmpInst(parent, Opcode::FCmp, l, r, gt, lt, eq)
+            : CmpInst(parent, Opcode::FCmp, l, r, gt, lt, eq J_NAME_A)
             , ordered{ordered}
             {}
 
@@ -345,9 +368,9 @@ class CallInst : public Instruction {
     public:
         inline CallInst(
             BasicBlock *parent, FunctionType *fTy, Instruction *callee,
-            const std::vector<Instruction *> &args
+            const std::vector<Instruction *> &args J_NAME_P
         )
-            : Instruction(parent, Opcode::Call, fTy->getReturnType())
+            : Instruction(parent, Opcode::Call, fTy->getReturnType() J_NAME_A)
             , fType{fTy}
             , callee{callee}
             , args{args}
@@ -367,8 +390,8 @@ class ArgInst : public Instruction {
         int idx;
 
     public:
-        inline ArgInst(BasicBlock *parent, const Type &type, int idx)
-            : Instruction(parent, Opcode::Arg, type)
+        inline ArgInst(BasicBlock *parent, const Type &type, int idx J_NAME_P)
+            : Instruction(parent, Opcode::Arg, type J_NAME_A)
             , idx{idx}
             {}
 
@@ -388,19 +411,19 @@ class LiteralInst : public Instruction {
 
     public:
         inline LiteralInst(
-            BasicBlock *parent, const Type &type, long long sValue
+            BasicBlock *parent, const Type &type, long long sValue J_NAME_P
         )
             : Instruction(parent,
                 type.getBaseType() == BaseType::Signed
                     ? Opcode::SLiteral : Opcode::ULiteral,
-                type)
+                type J_NAME_A)
             , sValue{sValue}
             {}
 
         inline LiteralInst(
-            BasicBlock *parent, const Type &type, double fltValue
+            BasicBlock *parent, const Type &type, double fltValue J_NAME_P
         )
-            : Instruction(parent, Opcode::FLiteral, type)
+            : Instruction(parent, Opcode::FLiteral, type J_NAME_A)
             , fltValue{fltValue}
             {}
 
@@ -417,8 +440,8 @@ class FuncLiteralInst : public Instruction {
         Function *value;
 
     public:
-        inline FuncLiteralInst(BasicBlock *parent, Function *value)
-            : Instruction(parent, Opcode::FuncLiteral, Type::pointerType())
+        inline FuncLiteralInst(BasicBlock *parent, Function *value J_NAME_P)
+            : Instruction(parent, Opcode::FuncLiteral, Type::pointerType() J_NAME_A)
             , value{value}
             {}
 
@@ -433,8 +456,8 @@ class CodeLiteralInst : public Instruction {
         void *value;
 
     public:
-        inline CodeLiteralInst(BasicBlock *parent, void *value)
-            : Instruction(parent, Opcode::CodeLiteral, Type::codePointerType())
+        inline CodeLiteralInst(BasicBlock *parent, void *value J_NAME_P)
+            : Instruction(parent, Opcode::CodeLiteral, Type::codePointerType() J_NAME_A)
             , value{value}
             {}
 
@@ -442,6 +465,8 @@ class CodeLiteralInst : public Instruction {
 };
 
 #undef J_GETTERS
+#undef J_NAME_P
+#undef J_NAME_A
 
 }
 
