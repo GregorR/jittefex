@@ -2,3 +2,4 @@ toy
 deps.mk
 *.o
 autom4te.cache
+build
