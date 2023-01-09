@@ -802,14 +802,6 @@ jittefex::Function *getFunction(std::string Name) {
   return nullptr;
 }
 
-/// CreateEntryBlockAlloca - Create an alloca instruction in the entry block of
-/// the function.  This is used for mutable variables etc.
-static jittefex::Instruction *CreateEntryBlockAlloca(jittefex::Function *TheFunction,
-                                          const std::string &VarName) {
-  jittefex::IRBuilder TmpB(TheModule.get(), TheFunction->getEntryBlock());
-  return TmpB.createAlloca(jittefex::Type::floatType(8), nullptr, VarName);
-}
-
 jittefex::Instruction *NumberExprAST::codegen() {
   return Builder->createFltLiteral(jittefex::Type::floatType(8), Val);
 }
@@ -1050,8 +1042,8 @@ jittefex::Instruction *IfExprAST::codegen() {
 jittefex::Instruction *ForExprAST::codegen() {
   jittefex::Function *TheFunction = Builder->getInsertBlock()->getParent();
 
-  // Create an alloca for the variable in the entry block.
-  jittefex::Instruction *Alloca = CreateEntryBlockAlloca(TheFunction, VarName);
+  // Create an alloca for the variable
+  jittefex::Instruction *Alloca = Builder->createAlloca(jittefex::Type::floatType(8), nullptr, VarName);
 
   // Emit the start code first, without 'variable' in scope.
   jittefex::Instruction *StartVal = Start->codegen();
@@ -1160,7 +1152,7 @@ jittefex::Instruction *VarExprAST::codegen() {
       InitVal = Builder->createFltLiteral(jittefex::Type::floatType(8), 0.0);
     }
 
-    jittefex::Instruction *Alloca = CreateEntryBlockAlloca(TheFunction, VarName);
+    jittefex::Instruction *Alloca = Builder->createAlloca(jittefex::Type::floatType(8), nullptr, VarName);
     Builder->createStore(InitVal, Alloca);
     Builder->release(InitVal);
 
@@ -1209,7 +1201,7 @@ jittefex::Function *FunctionAST::codegen() {
   // reference to it for use below.
   auto &P = *Proto;
   FunctionProtos[Proto->getName()] = std::move(Proto);
-  jittefex::Function *TheFunction = getFunction(P.getName());
+  jittefex::Function *TheFunction = P.codegen();
   if (!TheFunction)
     return nullptr;
 
@@ -1226,7 +1218,7 @@ jittefex::Function *FunctionAST::codegen() {
   int idx = 0;
   for (auto &ArgName : P.getArgs()) {
     // Create an alloca for this variable.
-    jittefex::Instruction *Alloca = CreateEntryBlockAlloca(TheFunction, ArgName);
+    jittefex::Instruction *Alloca = Builder->createAlloca(jittefex::Type::floatType(8), nullptr, ArgName);
     jittefex::Instruction *JArg = Builder->createArg(idx++);
 
     // Store the initial value into the alloca.

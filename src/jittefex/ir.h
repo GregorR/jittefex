@@ -100,6 +100,10 @@ class Function {
         friend class IRBuilder;
 #endif
 
+#ifdef JITTEFEX_HAVE_LLVM
+        void *llvmCode = nullptr;
+#endif
+
     private:
         FunctionType *type;
         std::string name;

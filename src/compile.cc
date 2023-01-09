@@ -38,7 +38,7 @@ llvm::Expected<llvm::Value *> toLLVM(
 unsigned long long llvmNameCtr = 0;
 #endif
 
-void *Function::compile() {
+inline void *Function::compile() {
     // FIXME: This needs to support multiple runmodes
 #ifdef JITTEFEX_USE_SFJIT
     if (sljitCompiler) {
@@ -72,6 +72,9 @@ void *Function::compile() {
 #endif
 
 #ifdef JITTEFEX_HAVE_LLVM
+    if (llvmCode)
+        return llvmCode;
+
     std::string name = this->name + std::to_string(llvmNameCtr++);
 
     // Create a module for this function
@@ -90,11 +93,15 @@ void *Function::compile() {
     basicBlocks[entryBlock] =
         llvm::BasicBlock::Create(*llvmContext, entryBlock->getName(), lf);
 
+    // And our instructions
+    std::unordered_map<Instruction *, llvm::Value *> instrs;
+
     // And an LLVM builder
     llvm::IRBuilder<> builder{*llvmContext};
 
     // Go through each basic block...
     for (auto &blockUP : blocks) {
+        std::cerr << blockUP.get() << std::endl;
         BasicBlock *block = blockUP.get();
         llvm::BasicBlock *llvmBB = nullptr;
 
@@ -112,11 +119,9 @@ void *Function::compile() {
         }
         builder.SetInsertPoint(llvmBB);
 
-        // Start our instruction conversion
-        std::unordered_map<Instruction *, llvm::Value *> instrs;
-
         // Then go through each of the instructions...
         for (auto &instrUP : block->getInstructions()) {
+            std::cerr << "  " << instrUP.get() << std::endl;
             Instruction *instr = instrUP.get();
 
             // Convert it
@@ -128,28 +133,37 @@ void *Function::compile() {
                     auto it = basicBlocks.find(from);
                     if (it != basicBlocks.end())
                         return it->second;
-                    return basicBlocks[from] = llvm::BasicBlock::Create(*llvmContext, from->getName(), lf);
+                    return basicBlocks[from] =
+                        llvm::BasicBlock::Create(*llvmContext, from->getName(),
+                            lf);
                 }
             ));
         }
     }
 
+    for (auto &blockUP : blocks) {
+        std::cerr << blockUP.get() << " -> " << basicBlocks[blockUP.get()] << std::endl;
+    }
+
     // FIXME: DEBUGGING ONLY
     llvm::raw_os_ostream roos{std::cerr};
     llvm::verifyFunction(*lf, &roos);
-#if 0
     lf->print(roos);
+#if 0
 #endif
 
     // Compile the module
     Jittefex *jit = parent->getParent();
-    auto tsm = llvm::orc::ThreadSafeModule{std::move(llvmModule), std::move(llvmContext)};
+    auto tsm = llvm::orc::ThreadSafeModule{
+        std::move(llvmModule), std::move(llvmContext)};
     exitOnErr(jit->addModule(std::move(tsm)));
 
     // Get the compiled function
+    std::cerr << name << std::endl;
     auto sym = exitOnErr(jit->lookup(name));
+    std::cerr << name << "+" << std::endl;
 
-    return (void *) sym.getAddress();
+    return (llvmCode = (void *) sym.getAddress());
 
 #else
     abort();
@@ -164,7 +178,7 @@ void *Function::compile() {
 llvm::Expected<llvm::Value *> toLLVM(
     llvm::Function *func, Instruction *instr, llvm::IRBuilder<> &builder,
     std::function<llvm::Value *(Instruction *)> ic,
-    std::function<llvm::BasicBlock *(BasicBlock *)> bbConv
+    std::function<llvm::BasicBlock *(BasicBlock *)> bc
 ) {
     llvm::LLVMContext &context = builder.getContext();
 
@@ -173,6 +187,18 @@ llvm::Expected<llvm::Value *> toLLVM(
         {
             auto i = (RetInst *) instr;
             return builder.CreateRet(ic(i->getValue()));
+        }
+
+        case Opcode::Br: // 2
+        {
+            auto i = (BrInst *) instr;
+            auto *cond = i->getCondition();
+            if (cond) {
+                return builder.CreateCondBr(
+                    ic(cond), bc(i->getThenBlock()), bc(i->getElseBlock()));
+            } else {
+                return builder.CreateBr(bc(i->getThenBlock()));
+            }
         }
 
         case Opcode::FAdd: // 14
@@ -223,6 +249,13 @@ llvm::Expected<llvm::Value *> toLLVM(
         {
             auto i = (StoreInst *) instr;
             return builder.CreateStore(ic(i->getVal()), ic(i->getPtr()));
+        }
+
+        case Opcode::UIToFP:
+        {
+            auto i = (CastInst *) instr;
+            return builder.CreateUIToFP(ic(i->getS()),
+                i->getType().getLLVMType(context));
         }
 
         case Opcode::FCmp: // 54
@@ -302,29 +335,33 @@ llvm::Expected<llvm::Value *> toLLVM(
         case Opcode::Call: // 56
         {
             auto i = (CallInst *) instr;
-
-            // First we compile the function, so call compile
-            llvm::Value *compiler = llvm::Constant::getIntegerValue(
-                llvm::PointerType::getUnqual(context),
-                llvm::APInt(
-                    sizeof(void *) * 8,
-                    (size_t) (void *) jittefex::compile
-                )
-            );
-
-            // The argument to run() is the function itself
-            llvm::FunctionType *calleeType =
-                i->getFType()->getLLVMFunctionType(context);
             llvm::Value *callee = ic(i->getCallee());
 
-            // Compile it
-            std::vector<llvm::Type *> cParams{
-                llvm::PointerType::getUnqual(context)};
-            std::vector<llvm::Value *> cArgs{callee};
-            llvm::FunctionType *cFTy = llvm::FunctionType::get(
-                llvm::PointerType::getUnqual(context),
-                cParams, false);
-            llvm::Value *compiled = builder.CreateCall(cFTy, compiler, cArgs);
+            if (i->getCallee()->getType().getBaseType() == BaseType::Pointer) {
+                // This is *our* function, so a Function *
+
+                // First we compile the function, so call compile
+                llvm::Value *compiler = llvm::Constant::getIntegerValue(
+                        llvm::PointerType::getUnqual(context),
+                        llvm::APInt(
+                            sizeof(void *) * 8,
+                            (size_t) (void *) jittefex::compile
+                            )
+                        );
+
+                // Compile it
+                std::vector<llvm::Type *> cParams{
+                    llvm::PointerType::getUnqual(context)};
+                std::vector<llvm::Value *> cArgs{callee};
+                llvm::FunctionType *cFTy = llvm::FunctionType::get(
+                        llvm::PointerType::getUnqual(context),
+                        cParams, false);
+                callee = builder.CreateCall(cFTy, compiler, cArgs);
+
+            }
+
+            llvm::FunctionType *calleeType =
+                i->getFType()->getLLVMFunctionType(context);
 
             // Get the arguments
             std::vector<llvm::Value *> args;
@@ -332,7 +369,7 @@ llvm::Expected<llvm::Value *> toLLVM(
                 args.push_back(ic(a));
 
             // Call it
-            return builder.CreateCall(calleeType, compiled, args);
+            return builder.CreateCall(calleeType, callee, args);
         }
 
         case Opcode::Arg: // 1101
@@ -378,6 +415,18 @@ llvm::Expected<llvm::Value *> toLLVM(
                 llvm::APInt(
                     sizeof(void *) * 8,
                     (size_t) (void *) i->getValue()
+                )
+            );
+        }
+
+        case Opcode::CodeLiteral: // 1206
+        {
+            auto i = (CodeLiteralInst *) instr;
+            return llvm::Constant::getIntegerValue(
+                llvm::PointerType::getUnqual(context),
+                llvm::APInt(
+                    sizeof(void *) * 8,
+                    (size_t) i->getValue()
                 )
             );
         }
