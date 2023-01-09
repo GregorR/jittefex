@@ -148,8 +148,8 @@ inline void *Function::compile() {
     // FIXME: DEBUGGING ONLY
     llvm::raw_os_ostream roos{std::cerr};
     llvm::verifyFunction(*lf, &roos);
-    lf->print(roos);
 #if 0
+    lf->print(roos);
 #endif
 
     // Compile the module
