@@ -28,10 +28,9 @@ JITTEFEX_HAVE_LLVM='#undef JITTEFEX_HAVE_LLVM'
 AS_IF([test x"$with_llvm" != xno], [
 printf 'checking for LLVM... '
 LLVM_CONFIG=llvm-config
-if test x"$with_llvm" != xyes -a x"$with_llvm" != x
-then
+AS_IF([test x"$with_llvm" != xyes -a x"$with_llvm" != x], [
     LLVM_CONFIG="$with_llvm/bin/llvm-config"
-fi
+])
 $[]LLVM_CONFIG --libs core orcjit native > /dev/null 2>&1
 if test "$?" = "0"
 then
@@ -107,6 +106,18 @@ AS_IF([test x"$enable_debug" != xno], [
     CXXFLAGS="$CXXFLAGS -DNDEBUG=1"
 ])
 AC_SUBST([JITTEFEX_ENABLE_DEBUG])
+
+# Extras
+JITTEFEX_PREFIX='#define JITTEFEX_PREFIX "'"$prefix"'"'
+AS_IF([test x"$prefix" = "xNONE"], [
+    JITTEFEX_PREFIX='#define JITTEFEX_PREFIX "'"$ac_default_prefix"'"'
+])
+AC_SUBST([JITTEFEX_PREFIX])
+JITTEFEX_LLVM_CONFIG='#undef JITTEFEX_LLVM_CONFIG'
+AS_IF([test x"$with_llvm" != "xno"], [
+    JITTEFEX_LLVM_CONFIG='#define JITTEFEX_LLVM_CONFIG "'"$LLVM_CONFIG"'"'
+])
+AC_SUBST([JITTEFEX_LLVM_CONFIG])
 
 AC_CONFIG_FILES([Makefile src/Makefile examples/Makefile src/jittefex/config.h])
 AC_OUTPUT

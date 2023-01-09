@@ -586,6 +586,8 @@ ac_subst_vars='am__EXEEXT_FALSE
 am__EXEEXT_TRUE
 LTLIBOBJS
 LIBOBJS
+JITTEFEX_LLVM_CONFIG
+JITTEFEX_PREFIX
 JITTEFEX_ENABLE_DEBUG
 JITTEFEX_HAVE_SFJIT
 JITTEFEX_HAVE_LLVM
@@ -3680,9 +3682,10 @@ if test x"$with_llvm" != xno; then :
 
 printf 'checking for LLVM... '
 LLVM_CONFIG=llvm-config
-if test x"$with_llvm" != xyes -a x"$with_llvm" != x
-then
+if test x"$with_llvm" != xyes -a x"$with_llvm" != x; then :
+
     LLVM_CONFIG="$with_llvm/bin/llvm-config"
+
 fi
 $LLVM_CONFIG --libs core orcjit native > /dev/null 2>&1
 if test "$?" = "0"
@@ -3790,6 +3793,22 @@ else
 
     CFLAGS="$CFLAGS -DNDEBUG=1"
     CXXFLAGS="$CXXFLAGS -DNDEBUG=1"
+
+fi
+
+
+# Extras
+JITTEFEX_PREFIX='#define JITTEFEX_PREFIX "'"$prefix"'"'
+if test x"$prefix" = "xNONE"; then :
+
+    JITTEFEX_PREFIX='#define JITTEFEX_PREFIX "'"$ac_default_prefix"'"'
+
+fi
+
+JITTEFEX_LLVM_CONFIG='#undef JITTEFEX_LLVM_CONFIG'
+if test x"$with_llvm" != "xno"; then :
+
+    JITTEFEX_LLVM_CONFIG='#define JITTEFEX_LLVM_CONFIG "'"$LLVM_CONFIG"'"'
 
 fi
 
