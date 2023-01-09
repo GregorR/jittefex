@@ -17,7 +17,6 @@ AC_PROG_CXX([clang++ g++ c++])
 AC_PROG_RANLIB
 
 # Checks for libraries.
-
 AC_ARG_WITH([llvm],
     [AS_HELP_STRING([--with-llvm], [enable support for LLVM's ORC JIT])],
     [], [with_llvm=""])
@@ -95,6 +94,19 @@ AC_SUBST([JITTEFEX_HAVE_SFJIT])
 # Checks for typedefs, structures, and compiler characteristics.
 
 # Checks for library functions.
+
+# Checks for options.
+JITTEFEX_ENABLE_DEBUG='#undef JITTEFEX_ENABLE_DEBUG'
+AC_ARG_ENABLE([debug],
+    [AS_HELP_STRING([--enable-debug], [enable debugging features and checks])],
+    [], [enable_debug=no])
+AS_IF([test x"$enable_debug" != xno], [
+    JITTEFEX_ENABLE_DEBUG='#define JITTEFEX_ENABLE_DEBUG 1'
+], [
+    CFLAGS="$CFLAGS -DNDEBUG=1"
+    CXXFLAGS="$CXXFLAGS -DNDEBUG=1"
+])
+AC_SUBST([JITTEFEX_ENABLE_DEBUG])
 
 AC_CONFIG_FILES([Makefile src/Makefile examples/Makefile src/jittefex/config.h])
 AC_OUTPUT
