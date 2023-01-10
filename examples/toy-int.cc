@@ -958,7 +958,7 @@ jittefex::Instruction *IfExprAST::codegen() {
 
   // Convert condition to a bool by comparing equal to 0.0.
   auto *zero = Builder->createIntLiteral(jittefex::Type::signedWordType(), 0);
-  CondV = Builder->createFCmpONE(
+  CondV = Builder->createICmpNE(
       CondV, zero, "ifcond");
   Builder->release(zero);
 
@@ -1079,7 +1079,7 @@ jittefex::Instruction *ForExprAST::codegen() {
       return nullptr;
   } else {
     // If not specified, use 1.0.
-    StepVal = Builder->createFltLiteral(jittefex::Type::signedWordType(), 1.0);
+    StepVal = Builder->createIntLiteral(jittefex::Type::signedWordType(), 1);
   }
 
   // Compute the end condition.
@@ -1099,7 +1099,7 @@ jittefex::Instruction *ForExprAST::codegen() {
 
   // Convert condition to a bool by comparing equal to 0.0.
   auto *zero = Builder->createIntLiteral(jittefex::Type::signedWordType(), 0);
-  EndCond = Builder->createFCmpONE(
+  EndCond = Builder->createICmpNE(
       EndCond, zero, "loopcond");
   Builder->release(zero);
 
@@ -1303,7 +1303,7 @@ static void HandleTopLevelExpression() {
 #endif
       ptrdiff_t (*f)();
       f = (ptrdiff_t(*)()) jittefex::compile(F);
-      fprintf(stderr, "Evaluated to %d\n", f());
+      fprintf(stderr, "Evaluated to %d\n", (int) f());
       //InitializeModule();
       F->eraseFromParent();
     }

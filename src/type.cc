@@ -56,12 +56,12 @@ int Type::getSLJITType() const {
 #if (defined SLJIT_64BIT_ARCHITECTURE && SLJIT_64BIT_ARCHITECTURE)
             if (width == 8)
                 return SLJIT_ARG_TYPE_W;
-            else if (width == 4)
+            else if (width <= 4)
                 return SLJIT_ARG_TYPE_32;
             else
                 return -1;
 #else
-            if (width == 4)
+            if (width <= 4)
                 return SLJIT_ARG_TYPE_W;
             else
                 return -1;

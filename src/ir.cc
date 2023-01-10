@@ -128,7 +128,7 @@ std::unique_ptr<Function> Function::create(
 #ifdef JITTEFEX_HAVE_SFJIT
 void Function::cancelSLJIT() {
     if (sljitCompiler) {
-#ifdef DEBUG
+#ifdef JITTEFEX_ENABLE_DEBUG
         abort();
 #endif
         sljit_free_compiler((struct sljit_compiler *) sljitCompiler);
