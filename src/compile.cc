@@ -110,7 +110,6 @@ void *compile(Function *func) {
 
     // Go through each basic block...
     for (auto &blockUP : func->blocks) {
-        std::cerr << blockUP.get() << std::endl;
         BasicBlock *block = blockUP.get();
         llvm::BasicBlock *llvmBB = nullptr;
 
@@ -130,7 +129,6 @@ void *compile(Function *func) {
 
         // Then go through each of the instructions...
         for (auto &instrUP : block->getInstructions()) {
-            std::cerr << "  " << instrUP.get() << std::endl;
             Instruction *instr = instrUP.get();
 
             // Convert it
@@ -164,9 +162,7 @@ void *compile(Function *func) {
     exitOnErr(jit->addModule(std::move(tsm)));
 
     // Get the compiled function
-    std::cerr << name << std::endl;
     auto sym = exitOnErr(jit->lookup(name));
-    std::cerr << name << "+" << std::endl;
 
     return (func->llvmCode = (void *) sym.getAddress());
 
