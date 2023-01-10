@@ -19,15 +19,27 @@
 #include <algorithm>
 #include <cassert>
 #include <cctype>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <iostream>
 #include <map>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
+
+//===----------------------------------------------------------------------===//
+// "Library" functions that can be "extern'd" from user code.
+//===----------------------------------------------------------------------===//
+
+/// printi - printf that takes an int and prints it as "%d\n", returning 0.
+extern "C" int printd(int X) {
+  fprintf(stderr, "%d\n", X);
+  return 0;
+}
 
 //===----------------------------------------------------------------------===//
 // Lexer
@@ -40,11 +52,11 @@ enum Token {
 
   // commands
   tok_def = -2,
-  tok_extern = -3,
 
   // primary
   tok_identifier = -4,
   tok_number = -5,
+  tok_exref = -20,
 
   // control
   tok_if = -6,
@@ -63,6 +75,7 @@ enum Token {
 
 static std::string IdentifierStr; // Filled in if tok_identifier
 static ptrdiff_t NumVal;             // Filled in if tok_number
+static void *ExRefVal;            // Filled in if tok_exref
 
 /// gettok - Return the next token from standard input.
 static int gettok() {
@@ -72,15 +85,13 @@ static int gettok() {
   while (isspace(LastChar))
     LastChar = getchar();
 
-  if (isalpha(LastChar)) { // identifier: [a-zA-Z][a-zA-Z0-9]*
+  if (isalpha(LastChar) || LastChar == '@') { // identifier: [a-zA-Z][a-zA-Z0-9]*
     IdentifierStr = LastChar;
     while (isalnum((LastChar = getchar())))
       IdentifierStr += LastChar;
 
     if (IdentifierStr == "def")
       return tok_def;
-    if (IdentifierStr == "extern")
-      return tok_extern;
     if (IdentifierStr == "if")
       return tok_if;
     if (IdentifierStr == "then")
@@ -97,6 +108,23 @@ static int gettok() {
       return tok_unary;
     if (IdentifierStr == "var")
       return tok_var;
+    if (IdentifierStr[0] == '@') {
+      if (IdentifierStr == "@putchard") {
+        ExRefVal = (void *) putchar;
+      } else if (IdentifierStr == "@printd") {
+        ExRefVal = (void *) printd;
+      } else if (IdentifierStr == "@sin") {
+        ExRefVal = (void *) sin;
+      } else if (IdentifierStr == "@cos") {
+        ExRefVal = (void *) cos;
+      } else if (IdentifierStr == "@atan2") {
+        ExRefVal = (void *) atan2;
+      } else {
+        std::cerr << "Unrecognized extern " << IdentifierStr << std::endl;
+        exit(1);
+      }
+      return tok_exref;
+    }
     return tok_identifier;
   }
 
@@ -107,7 +135,7 @@ static int gettok() {
       LastChar = getchar();
     } while (isdigit(LastChar) || LastChar == '.');
 
-    NumVal = (ptrdiff_t) strtoll(NumStr.c_str(), nullptr, 10);
+    NumVal = (ptrdiff_t) strtoll(NumStr.c_str(), nullptr, 0);
     return tok_number;
   }
 
@@ -198,6 +226,19 @@ class CallExprAST : public ExprAST {
 
 public:
   CallExprAST(const std::string &Callee,
+              std::vector<std::unique_ptr<ExprAST>> Args)
+      : Callee(Callee), Args(std::move(Args)) {}
+
+  jittefex::Instruction *codegen() override;
+};
+
+/// ExternCallExprAST - Expression class for extern function calls.
+class ExternCallExprAST : public ExprAST {
+  void *Callee;
+  std::vector<std::unique_ptr<ExprAST>> Args;
+
+public:
+  ExternCallExprAST(void *Callee,
               std::vector<std::unique_ptr<ExprAST>> Args)
       : Callee(Callee), Args(std::move(Args)) {}
 
@@ -347,6 +388,41 @@ static std::unique_ptr<ExprAST> ParseParenExpr() {
     return LogError("expected ')'");
   getNextToken(); // eat ).
   return V;
+}
+
+/// externrefexpr
+///   ::= identifier '(' expression* ')'
+static std::unique_ptr<ExprAST> ParseExternExpr() {
+  void *ExRef = ExRefVal;
+
+  getNextToken(); // eat identifier.
+
+  if (CurTok != '(') // Simple variable ref.
+    return LogError("expected '('");
+
+  // External call
+  getNextToken(); // eat (
+  std::vector<std::unique_ptr<ExprAST>> Args;
+  if (CurTok != ')') {
+    while (true) {
+      if (auto Arg = ParseExpression())
+        Args.push_back(std::move(Arg));
+      else
+        return nullptr;
+
+      if (CurTok == ')')
+        break;
+
+      if (CurTok != ',')
+        return LogError("Expected ')' or ',' in argument list");
+      getNextToken();
+    }
+  }
+
+  // Eat the ')'.
+  getNextToken();
+
+  return std::make_unique<ExternCallExprAST>(ExRefVal, std::move(Args));
 }
 
 /// identifierexpr
@@ -522,6 +598,8 @@ static std::unique_ptr<ExprAST> ParsePrimary() {
     return LogError("unknown token when expecting an expression");
   case tok_identifier:
     return ParseIdentifierExpr();
+  case tok_exref:
+    return ParseExternExpr();
   case tok_number:
     return ParseNumberExpr();
   case '(':
@@ -688,12 +766,6 @@ static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
   return nullptr;
 }
 
-/// external ::= 'extern' prototype
-static std::unique_ptr<PrototypeAST> ParseExtern() {
-  getNextToken(); // eat extern.
-  return ParsePrototype();
-}
-
 //===----------------------------------------------------------------------===//
 // Code Generation
 //===----------------------------------------------------------------------===//
@@ -723,14 +795,6 @@ jittefex::Function *getFunction(std::string Name) {
 
   // If no existing prototype exists, return null.
   return nullptr;
-}
-
-/// CreateEntryBlockAlloca - Create an alloca instruction in the entry block of
-/// the function.  This is used for mutable variables etc.
-static jittefex::Instruction *CreateEntryBlockAlloca(jittefex::Function *TheFunction,
-                                          const std::string &VarName) {
-  jittefex::IRBuilder TmpB(TheModule.get(), TheFunction->getEntryBlock());
-  return TmpB.createAlloca(jittefex::Type::signedWordType(), nullptr, VarName);
 }
 
 jittefex::Instruction *NumberExprAST::codegen() {
@@ -836,6 +900,28 @@ jittefex::Instruction *BinaryExprAST::codegen() {
   return ret;
 }
 
+jittefex::Instruction *ExternCallExprAST::codegen() {
+  std::vector<jittefex::Instruction *> ArgsV;
+  for (unsigned i = 0, e = Args.size(); i != e; ++i) {
+    ArgsV.push_back(Args[i]->codegen());
+    if (!ArgsV.back())
+      return nullptr;
+  }
+
+  // Make the function type:  ptrdiff_t(ptrdiff_t,ptrdiff_t) etc.
+  std::vector<jittefex::Type> Doubles(ArgsV.size(), jittefex::Type::signedWordType());
+  jittefex::FunctionType *FT =
+      jittefex::FunctionType::get(jittefex::Type::signedWordType(), Doubles, false);
+
+  jittefex::Instruction *FI = Builder->createCodeLiteral(Callee);
+
+  jittefex::Instruction *ret = Builder->createCall(FT, FI, ArgsV, "calltmp");
+  for (auto *arg : ArgsV)
+    Builder->release(arg);
+  Builder->release(FI);
+  return ret;
+}
+
 jittefex::Instruction *CallExprAST::codegen() {
   // Look up the name in the global module table.
   jittefex::Function *CalleeF = getFunction(Callee);
@@ -871,7 +957,7 @@ jittefex::Instruction *IfExprAST::codegen() {
 
   // Convert condition to a bool by comparing equal to 0.0.
   auto *zero = Builder->createIntLiteral(jittefex::Type::signedWordType(), 0);
-  CondV = Builder->createICmpNE(
+  CondV = Builder->createFCmpONE(
       CondV, zero, "ifcond");
   Builder->release(zero);
 
@@ -951,8 +1037,8 @@ jittefex::Instruction *IfExprAST::codegen() {
 jittefex::Instruction *ForExprAST::codegen() {
   jittefex::Function *TheFunction = Builder->getInsertBlock()->getParent();
 
-  // Create an alloca for the variable in the entry block.
-  jittefex::Instruction *Alloca = CreateEntryBlockAlloca(TheFunction, VarName);
+  // Create an alloca for the variable
+  jittefex::Instruction *Alloca = Builder->createAlloca(jittefex::Type::signedWordType(), nullptr, VarName);
 
   // Emit the start code first, without 'variable' in scope.
   jittefex::Instruction *StartVal = Start->codegen();
@@ -992,7 +1078,7 @@ jittefex::Instruction *ForExprAST::codegen() {
       return nullptr;
   } else {
     // If not specified, use 1.0.
-    StepVal = Builder->createIntLiteral(jittefex::Type::signedWordType(), 1);
+    StepVal = Builder->createFltLiteral(jittefex::Type::signedWordType(), 1.0);
   }
 
   // Compute the end condition.
@@ -1012,7 +1098,7 @@ jittefex::Instruction *ForExprAST::codegen() {
 
   // Convert condition to a bool by comparing equal to 0.0.
   auto *zero = Builder->createIntLiteral(jittefex::Type::signedWordType(), 0);
-  EndCond = Builder->createICmpNE(
+  EndCond = Builder->createFCmpONE(
       EndCond, zero, "loopcond");
   Builder->release(zero);
 
@@ -1061,7 +1147,7 @@ jittefex::Instruction *VarExprAST::codegen() {
       InitVal = Builder->createIntLiteral(jittefex::Type::signedWordType(), 0);
     }
 
-    jittefex::Instruction *Alloca = CreateEntryBlockAlloca(TheFunction, VarName);
+    jittefex::Instruction *Alloca = Builder->createAlloca(jittefex::Type::signedWordType(), nullptr, VarName);
     Builder->createStore(InitVal, Alloca);
     Builder->release(InitVal);
 
@@ -1110,7 +1196,7 @@ jittefex::Function *FunctionAST::codegen() {
   // reference to it for use below.
   auto &P = *Proto;
   FunctionProtos[Proto->getName()] = std::move(Proto);
-  jittefex::Function *TheFunction = getFunction(P.getName());
+  jittefex::Function *TheFunction = P.codegen();
   if (!TheFunction)
     return nullptr;
 
@@ -1127,7 +1213,7 @@ jittefex::Function *FunctionAST::codegen() {
   int idx = 0;
   for (auto &ArgName : P.getArgs()) {
     // Create an alloca for this variable.
-    jittefex::Instruction *Alloca = CreateEntryBlockAlloca(TheFunction, ArgName);
+    jittefex::Instruction *Alloca = Builder->createAlloca(jittefex::Type::signedWordType(), nullptr, ArgName);
     jittefex::Instruction *JArg = Builder->createArg(idx++);
 
     // Store the initial value into the alloca.
@@ -1190,22 +1276,6 @@ static void HandleDefinition() {
   }
 }
 
-static void HandleExtern() {
-  if (auto ProtoAST = ParseExtern()) {
-    if (auto *FnIR = ProtoAST->codegen()) {
-      fprintf(stderr, "Read extern: ");
-#if 0
-      FnIR->getLLVMFunction()->print(llvm::errs());
-#endif
-      fprintf(stderr, "\n");
-      FunctionProtos[ProtoAST->getName()] = std::move(ProtoAST);
-    }
-  } else {
-    // Skip token for error recovery.
-    getNextToken();
-  }
-}
-
 static void HandleTopLevelExpression() {
   // Evaluate a top-level expression into an anonymous function.
   if (auto FnAST = ParseTopLevelExpr()) {
@@ -1225,15 +1295,16 @@ static void HandleTopLevelExpression() {
       // Get the symbol's address and cast it to the right type (takes no
       // arguments, returns a ptrdiff_t) so we can call it as a native function.
       auto *FP = (ptrdiff_t (*)())(intptr_t)Sym.getAddress();
-      fprintf(stderr, "Evaluated to %d\n", FP());
+      fprintf(stderr, "Evaluated to %f\n", FP());
 
       // Delete the anonymous expression module from the JIT.
       ExitOnErr(RT->remove());
 #endif
       ptrdiff_t (*f)();
       f = (ptrdiff_t(*)()) F->compile();
-      fprintf(stderr, "Evaluated to %d\n", (int) f());
-      InitializeModule();
+      fprintf(stderr, "Evaluated to %d\n", f());
+      //InitializeModule();
+      F->eraseFromParent();
     }
   } else {
     // Skip token for error recovery.
@@ -1241,7 +1312,7 @@ static void HandleTopLevelExpression() {
   }
 }
 
-/// top ::= definition | external | expression | ';'
+/// top ::= definition | expression | ';'
 static void MainLoop() {
   while (true) {
     fprintf(stderr, "ready> ");
@@ -1254,30 +1325,11 @@ static void MainLoop() {
     case tok_def:
       HandleDefinition();
       break;
-    case tok_extern:
-      HandleExtern();
-      break;
     default:
       HandleTopLevelExpression();
       break;
     }
   }
-}
-
-//===----------------------------------------------------------------------===//
-// "Library" functions that can be "extern'd" from user code.
-//===----------------------------------------------------------------------===//
-
-/// putchard - putchar that takes a ptrdiff_t and returns 0.
-extern "C" ptrdiff_t putchard(ptrdiff_t X) {
-  fputc((char)X, stderr);
-  return 0;
-}
-
-/// printd - printf that takes a ptrdiff_t prints it as "%d\n", returning 0.
-extern "C" ptrdiff_t printd(ptrdiff_t X) {
-  fprintf(stderr, "%d\n", (int) X);
-  return 0;
 }
 
 //===----------------------------------------------------------------------===//
