@@ -46,20 +46,21 @@ llvm::Expected<llvm::Value *> toLLVM(
 unsigned long long llvmNameCtr = 0;
 #endif
 
-inline void *Function::compile() {
+void *compile(Function *func) {
     // FIXME: This needs to support multiple runmodes
 #ifdef JITTEFEX_USE_SFJIT
-    if (sljitCompiler) {
-        struct sljit_compiler *sc = (struct sljit_compiler *) sljitCompiler;
+    if (func->sljitCompiler) {
+        struct sljit_compiler *sc =
+            (struct sljit_compiler *) func->sljitCompiler;
 
         // Fill the local space alloca
-        if (sljit_set_alloca(sc, (struct sljit_alloca *) sljitAlloca,
-            sljitStack.size() * sizeof(sljit_f64)))
+        if (sljit_set_alloca(sc, (struct sljit_alloca *) func->sljitAlloca,
+            func->sljitStack.size() * sizeof(sljit_f64)))
             sc = nullptr;
 
         // Handle all labels
         if (sc) {
-            for (auto &b : blocks) {
+            for (auto &b : func->blocks) {
                 struct sljit_label *l = (struct sljit_label *) b->sljitLabel;
                 for (auto *vj : b->sljitLabelReqs) {
                     sljit_set_label((struct sljit_jump *) vj, l);
@@ -69,28 +70,28 @@ inline void *Function::compile() {
 
         // Then generate code
         if (sc)
-            sljitCode = sljit_generate_code(sc);
+            func->sljitCode = sljit_generate_code(sc);
 
-        sljit_free_compiler((struct sljit_compiler *) sljitCompiler);
-        sljitCompiler = nullptr;
+        sljit_free_compiler((struct sljit_compiler *) func->sljitCompiler);
+        func->sljitCompiler = nullptr;
     }
 
-    if (sljitCode)
-        return sljitCode;
+    if (func->sljitCode)
+        return func->sljitCode;
 #endif
 
 #ifdef JITTEFEX_HAVE_LLVM
-    if (llvmCode)
-        return llvmCode;
+    if (func->llvmCode)
+        return func->llvmCode;
 
-    std::string name = this->name + std::to_string(llvmNameCtr++);
+    std::string name = func->name + std::to_string(llvmNameCtr++);
 
     // Create a module for this function
     auto llvmContext = std::make_unique<llvm::LLVMContext>();
     auto llvmModule = std::make_unique<llvm::Module>(name, *llvmContext);
 
     // Convert our function type to an LLVM function type
-    llvm::FunctionType *lft = type->getLLVMFunctionType(*llvmContext);
+    llvm::FunctionType *lft = func->type->getLLVMFunctionType(*llvmContext);
 
     // Create our LLVM function
     llvm::Function *lf = llvm::Function::Create(lft,
@@ -98,8 +99,8 @@ inline void *Function::compile() {
 
     // Keep track of all our blocks
     std::unordered_map<BasicBlock *, llvm::BasicBlock *> basicBlocks;
-    basicBlocks[entryBlock] =
-        llvm::BasicBlock::Create(*llvmContext, entryBlock->getName(), lf);
+    basicBlocks[func->entryBlock] =
+        llvm::BasicBlock::Create(*llvmContext, func->entryBlock->getName(), lf);
 
     // And our instructions
     std::unordered_map<Instruction *, llvm::Value *> instrs;
@@ -108,7 +109,7 @@ inline void *Function::compile() {
     llvm::IRBuilder<> builder{*llvmContext};
 
     // Go through each basic block...
-    for (auto &blockUP : blocks) {
+    for (auto &blockUP : func->blocks) {
         std::cerr << blockUP.get() << std::endl;
         BasicBlock *block = blockUP.get();
         llvm::BasicBlock *llvmBB = nullptr;
@@ -149,10 +150,6 @@ inline void *Function::compile() {
         }
     }
 
-    for (auto &blockUP : blocks) {
-        std::cerr << blockUP.get() << " -> " << basicBlocks[blockUP.get()] << std::endl;
-    }
-
     // FIXME: DEBUGGING ONLY
     llvm::raw_os_ostream roos{std::cerr};
     llvm::verifyFunction(*lf, &roos);
@@ -161,7 +158,7 @@ inline void *Function::compile() {
 #endif
 
     // Compile the module
-    Jittefex *jit = parent->getParent();
+    Jittefex *jit = func->parent->getParent();
     auto tsm = llvm::orc::ThreadSafeModule{
         std::move(llvmModule), std::move(llvmContext)};
     exitOnErr(jit->addModule(std::move(tsm)));
@@ -171,7 +168,7 @@ inline void *Function::compile() {
     auto sym = exitOnErr(jit->lookup(name));
     std::cerr << name << "+" << std::endl;
 
-    return (llvmCode = (void *) sym.getAddress());
+    return (func->llvmCode = (void *) sym.getAddress());
 
 #else
     abort();
@@ -455,9 +452,5 @@ llvm::Expected<llvm::Value *> toLLVM(
 #undef NAME
 }
 #endif
-
-void *compile(Function *func) {
-    return func->compile();
-}
 
 }

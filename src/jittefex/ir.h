@@ -34,6 +34,7 @@ class BasicBlock {
         Function *parent = nullptr;
         friend class Function;
         friend class IRBuilder;
+        friend void *compile(Function *);
 
 #ifdef JITTEFEX_HAVE_SFJIT
         void *sljitLabel = nullptr; // Label for this basic block
@@ -71,6 +72,7 @@ class Function {
     protected:
         Module *parent = nullptr;
         friend class Module;
+        friend void *compile(Function *);
 
 #ifdef JITTEFEX_HAVE_SFJIT
         void *sljitCompiler = nullptr; // actually struct sljit_compiler *
@@ -129,12 +131,6 @@ class Function {
         static std::unique_ptr<Function> create(
             FunctionType *type, const std::string &name = ""
         );
-
-        /**
-         * Compile this into a runnable function. Must be run immediately, as
-         * compiled versions can be freed.
-         */
-        void *compile();
 
 #ifdef JITTEFEX_HAVE_SFJIT
         /**

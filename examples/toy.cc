@@ -14,6 +14,7 @@
 
 #include "jittefex/instruction.h"
 #include "jittefex/builder.h"
+#include "jittefex/compile.h"
 #include "jittefex/jit.h"
 
 #include <algorithm>
@@ -1306,7 +1307,7 @@ static void HandleTopLevelExpression() {
       ExitOnErr(RT->remove());
 #endif
       double (*f)();
-      f = (double(*)()) F->compile();
+      f = (double(*)()) jittefex::compile(F);
       fprintf(stderr, "Evaluated to %f\n", f());
       //InitializeModule();
       F->eraseFromParent();
