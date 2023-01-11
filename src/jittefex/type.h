@@ -29,6 +29,12 @@ enum BaseType {
     Signed,
     Unsigned,
     Float,
+
+    /* Special type used by Alloca for stack-allocated space. You need to take
+     * an extra step to get the actual pointer to alloca'd space, so it's given
+     * a different type to enforce this step if you need it. */
+    Stack,
+
     Pointer,
     CodePointer
 };
@@ -78,12 +84,35 @@ class Type {
             return Type{BaseType::Float, width};
         }
 
+        static inline Type stackType() {
+            return Type{BaseType::Stack, 0};
+        }
+
         static inline Type pointerType() {
             return Type{BaseType::Pointer, sizeof(void *)};
         }
 
         static inline Type codePointerType() {
             return Type{BaseType::CodePointer, sizeof(void (*)(void))};
+        }
+
+        // Common properties of types
+        inline bool isManifest() {
+            return baseType != BaseType::Void && baseType != BaseType::Stack;
+        }
+
+        inline bool isInteger() {
+            return baseType == BaseType::Signed ||
+                baseType == BaseType::Unsigned;
+        }
+
+        inline bool isNumeric() {
+            return isInteger() || baseType == BaseType::Float;
+        }
+
+        inline bool isAnyPointer() {
+            return baseType == BaseType::Pointer ||
+                baseType == BaseType::CodePointer;
         }
 
         /**

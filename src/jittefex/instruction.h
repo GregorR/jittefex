@@ -239,7 +239,7 @@ class AllocaInst : public Instruction {
             BasicBlock *parent, const Type &type,
             Instruction *arraySize = nullptr J_NAME_P
         )
-            : Instruction(parent, Opcode::Alloca, Type::pointerType() J_NAME_A)
+            : Instruction(parent, Opcode::Alloca, Type::stackType() J_NAME_A)
             , allocaType{type}
             , arraySize{arraySize}
             {}

@@ -150,6 +150,9 @@ void IRBuilder::setInsertPoint(BasicBlock *to)
 Instruction *IRBuilder::createRet(
     Instruction *v
 ) {
+    if (v)
+        assert(v->getType().isManifest());
+
     Instruction *ret = insertionPoint->append(
         std::make_unique<RetInst>(insertionPoint, v));
 
@@ -221,6 +224,7 @@ Instruction *IRBuilder::createBr(
 Instruction *IRBuilder::createCondBr(
     Instruction *cond, BasicBlock *ifTrue, BasicBlock *ifFalse
 ) {
+    assert(cond->getType().isInteger());
     Instruction *ret = insertionPoint->append(
         std::make_unique<BrInst>(insertionPoint, cond, ifTrue, ifFalse));
 
@@ -267,7 +271,7 @@ Instruction *IRBuilder::createAdd(
     Instruction *l, Instruction *r, const std::string &name
 ) {
     (void) name;
-    assert(l->getType() == r->getType());
+    assert(l->getType() == r->getType() && l->getType().isInteger());
     Instruction *ret = insertionPoint->append(
         std::make_unique<BinaryInst>(insertionPoint, Opcode::Add, l->getType(),
             l, r NAME)
@@ -290,7 +294,7 @@ Instruction *IRBuilder::createSub(
     Instruction *l, Instruction *r, const std::string &name
 ) {
     (void) name;
-    assert(l->getType() == r->getType());
+    assert(l->getType() == r->getType() && l->getType().isInteger());
     Instruction *ret = insertionPoint->append(
         std::make_unique<BinaryInst>(insertionPoint, Opcode::Sub, l->getType(),
             l, r NAME)
@@ -313,7 +317,7 @@ Instruction *IRBuilder::createMul(
     Instruction *l, Instruction *r, const std::string &name
 ) {
     (void) name;
-    assert(l->getType() == r->getType());
+    assert(l->getType() == r->getType() && l->getType().isInteger());
     Instruction *ret = insertionPoint->append(
         std::make_unique<BinaryInst>(insertionPoint, Opcode::Mul, l->getType(),
             l, r NAME)
@@ -354,7 +358,8 @@ Instruction *IRBuilder::createFAdd(
     Instruction *l, Instruction *r, const std::string &name
 ) {
     (void) name;
-    assert(l->getType() == r->getType());
+    assert(l->getType() == r->getType() &&
+        l->getType().getBaseType() == BaseType::Float);
     Instruction *ret = insertionPoint->append(
         std::make_unique<BinaryInst>(
             insertionPoint, Opcode::FAdd, l->getType(), l, r NAME));
@@ -377,7 +382,8 @@ Instruction *IRBuilder::createFSub(
     Instruction *l, Instruction *r, const std::string &name
 ) {
     (void) name;
-    assert(l->getType() == r->getType());
+    assert(l->getType() == r->getType() &&
+        l->getType().getBaseType() == BaseType::Float);
     Instruction *ret = insertionPoint->append(
         std::make_unique<BinaryInst>(
             insertionPoint, Opcode::FSub, l->getType(), l, r NAME));
@@ -400,7 +406,8 @@ Instruction *IRBuilder::createFMul(
     Instruction *l, Instruction *r, const std::string &name
 ) {
     (void) name;
-    assert(l->getType() == r->getType());
+    assert(l->getType() == r->getType() &&
+        l->getType().getBaseType() == BaseType::Float);
     Instruction *ret = insertionPoint->append(
         std::make_unique<BinaryInst>(
             insertionPoint, Opcode::FMul, l->getType(), l, r NAME));
@@ -459,6 +466,13 @@ Instruction *IRBuilder::createLoad(
     // FIXME
     (void) isVolatile;
     (void) name;
+
+#ifdef JITTEFEX_ENABLE_DEBUG
+    const Type &pType = ptr->getType();
+    assert(pType.getBaseType() == BaseType::Pointer ||
+           pType.getBaseType() == BaseType::Stack);
+#endif
+
     Instruction *ret =
         insertionPoint->append(std::make_unique<LoadInst>(
             insertionPoint, ty, ptr NAME));
@@ -499,7 +513,7 @@ Instruction *IRBuilder::createLoad(
         if (!f->sljitAllocateRegister(flt, ret->sljitLoc))
             SCANCEL();
 
-        if (ptr->getOpcode() == Opcode::Alloca) {
+        if (ptr->getType().getBaseType() == BaseType::Stack) {
             /* The location is the actual allocated location, rather than a
              * pointer */
             if (flt) {
@@ -541,6 +555,13 @@ Instruction *IRBuilder::createStore(
 ) {
     // FIXME
     (void) isVolatile;
+
+#ifdef JITTEFEX_ENABLE_DEBUG
+    const Type &pType = ptr->getType();
+    assert(pType.getBaseType() == BaseType::Pointer ||
+           pType.getBaseType() == BaseType::Stack);
+#endif
+
     Instruction *ret = insertionPoint->append(
         std::make_unique<StoreInst>(insertionPoint, val, ptr));
 
@@ -622,6 +643,7 @@ Instruction *IRBuilder::createTrunc(
     abort();
 #endif
     (void) name;
+    assert(v->getType().isInteger());
     return insertionPoint->append(
         std::make_unique<CastInst>(insertionPoint, Opcode::Trunc, v, destTy NAME));
 }
@@ -631,6 +653,7 @@ Instruction *IRBuilder::createZExt(
     Instruction *v, const Type &destTy, const std::string &name
 ) {
     (void) name;
+    assert(v->getType().isInteger());
     Instruction *ret = insertionPoint->append(
         std::make_unique<CastInst>(insertionPoint, Opcode::ZExt, v, destTy NAME));
 
@@ -674,6 +697,7 @@ Instruction *IRBuilder::createSExt(
     abort();
 #endif
     (void) name;
+    assert(v->getType().isInteger());
     return insertionPoint->append(
         std::make_unique<CastInst>(insertionPoint, Opcode::SExt, v, destTy NAME));
 }
@@ -683,6 +707,7 @@ Instruction *IRBuilder::createUIToFP(
     Instruction *val, const Type &destTy, const std::string &name
 ) {
     (void) name;
+    assert(val->getType().isInteger());
     Instruction *ret = insertionPoint->append(std::make_unique<CastInst>(
         insertionPoint, Opcode::UIToFP, val, destTy NAME));
 
@@ -758,6 +783,7 @@ Instruction *IRBuilder::createICmpNE(
     Instruction *l, Instruction *r, const std::string &name
 ) {
     (void) name;
+    assert(l->getType() == r->getType() && l->getType().isInteger());
     Instruction *ret = insertionPoint->append(
         std::make_unique<ICmpInst>(
             insertionPoint, l, r,
@@ -783,6 +809,7 @@ Instruction *IRBuilder::createICmpSLT(
     Instruction *l, Instruction *r, const std::string &name
 ) {
     (void) name;
+    assert(l->getType() == r->getType() && l->getType().isInteger());
     Instruction *ret = insertionPoint->append(
         std::make_unique<ICmpInst>(
             insertionPoint, l, r,
@@ -838,7 +865,8 @@ Instruction *IRBuilder::createFCmpONE(
     Instruction *l, Instruction *r, const std::string &name
 ) {
     (void) name;
-    assert(l->getType() == r->getType());
+    assert(l->getType() == r->getType() &&
+        l->getType().getBaseType() == BaseType::Float);
     Instruction *ret = insertionPoint->append(
         std::make_unique<FCmpInst>(
             insertionPoint, l, r,
@@ -864,7 +892,8 @@ Instruction *IRBuilder::createFCmpULT(
     Instruction *l, Instruction *r, const std::string &name
 ) {
     (void) name;
-    assert(l->getType() == r->getType());
+    assert(l->getType() == r->getType() &&
+        l->getType().getBaseType() == BaseType::Float);
     Instruction *ret = insertionPoint->append(
         std::make_unique<FCmpInst>(
             insertionPoint, l, r,
@@ -892,6 +921,7 @@ Instruction *IRBuilder::createCall(
     const std::string &name
 ) {
     (void) name;
+    assert(callee->getType().isAnyPointer());
     Instruction *ret = insertionPoint->append(
         std::make_unique<CallInst>(insertionPoint, fTy, callee, args NAME));
 
