@@ -83,7 +83,7 @@ void IRBuilder::setInsertPoint(BasicBlock *to)
                         break;
                     }
                     if (sljit_emit_get_marg(
-                                sc, stype, SLJIT_R(argIdx++), &reg, &off)) {
+                        sc, stype, SLJIT_R(argIdx++), &reg, &off)) {
                         f->cancelSLJIT();
                         break;
                     }
@@ -91,7 +91,11 @@ void IRBuilder::setInsertPoint(BasicBlock *to)
                 }
             }
 
-            // Then get them out of registers
+            // Make the alloca for later filling
+            if (f->sljitCompiler)
+                f->sljitAlloca = sljit_emit_alloca(sc, 0);
+
+            // Get the args out of registers
             if (f->sljitCompiler) {
                 argIdx = 0;
                 for (auto &type : f->getFunctionType()->getParamTypes()) {
@@ -127,10 +131,6 @@ void IRBuilder::setInsertPoint(BasicBlock *to)
                 f->sljitRegs.push_back(false);
             for (int i = 0; i < SLJIT_NUMBER_OF_FLOAT_REGISTERS; i++)
                 f->sljitFRegs.push_back(false);
-
-            // Make the alloca for later filling
-            if (f->sljitCompiler)
-                f->sljitAlloca = sljit_emit_alloca(sc, 0);
 
             f->sljitInit = true;
         }
@@ -930,6 +930,7 @@ Instruction *IRBuilder::createCall(
         struct sljit_marg *marg;
         struct sljit_alloca *alloc;
         SLJITLocation loc, floc;
+        bool flocAllocated = false;
         sljit_s32 wordR, floatR, stackSpace,
             argI, wordI, floatI, stackI;
         std::unordered_map<sljit_s32, SLJITLocation> regMap;
@@ -973,28 +974,37 @@ Instruction *IRBuilder::createCall(
             ret->sljitLoc))
             SCANCEL();
 
+        // Figure out how many arguments we need
+        if (sljit_marg_properties(sc, marg, &wordR, &floatR, &stackSpace))
+            SCANCEL();
+
         // Compile the function if applicable
         if (callee->getType().getBaseType() == BaseType::Pointer) {
+            floc = SLJITLocation{SLJIT_S(SLJIT_NUMBER_OF_SAVED_REGISTERS), 0};
+            if (wordR >= floc.reg) {
+                // No use, put it on the stack
+                if (!f->sljitAllocateStack(floc))
+                    SCANCEL();
+                flocAllocated = true;
+            }
+
             if (sljit_emit_op1(sc, SLJIT_MOV_P, SLJIT_R0, 0,
                 callee->sljitLoc.reg, callee->sljitLoc.off))
                 SCANCEL();
             if (sljit_emit_icall(sc, SLJIT_CALL, SLJIT_ARGS1(P, P),
                 SLJIT_IMM, (sljit_sw) (void *) jittefex::compile))
                 SCANCEL();
-            if (sljit_emit_op1(sc, SLJIT_MOV_P,
-                SLJIT_S(SLJIT_NUMBER_OF_SAVED_REGISTERS), 0,
+            if (sljit_emit_op1(sc, SLJIT_MOV_P, floc.reg, floc.off,
                 SLJIT_R0, 0))
                 SCANCEL();
-            floc = SLJITLocation{SLJIT_S(SLJIT_NUMBER_OF_SAVED_REGISTERS), 0};
 
         } else { // CodePointer
             floc = callee->sljitLoc;
+            auto it = regMap.find(floc.reg);
+            if (it != regMap.end())
+                floc = it->second;
 
         }
-
-        // Figure out how many arguments we need
-        if (sljit_marg_properties(sc, marg, &wordR, &floatR, &stackSpace))
-            SCANCEL();
 
         // Get them into place
         if (stackSpace) {
@@ -1120,6 +1130,9 @@ Instruction *IRBuilder::createCall(
                 SCANCEL();
             f->sljitReleaseRegister(true, it.second);
         }
+
+        if (flocAllocated)
+            f->sljitReleaseRegister(false, floc);
     }
 #endif
 
