@@ -399,8 +399,6 @@ static std::unique_ptr<ExprAST> ParseParenExpr() {
 /// externrefexpr
 ///   ::= identifier '(' expression* ')'
 static std::unique_ptr<ExprAST> ParseExternExpr() {
-  void *ExRef = ExRefVal;
-
   getNextToken(); // eat identifier.
 
   if (CurTok != '(') // Simple variable ref.
@@ -1131,8 +1129,6 @@ jittefex::Instruction *ForExprAST::codegen() {
 
 jittefex::Instruction *VarExprAST::codegen() {
   std::vector<jittefex::Instruction *> OldBindings;
-
-  jittefex::Function *TheFunction = Builder->getInsertBlock()->getParent();
 
   // Register all variables and emit their initializer.
   for (unsigned i = 0, e = VarNames.size(); i != e; ++i) {
