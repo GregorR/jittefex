@@ -51,8 +51,6 @@ int Type::getSLJITType() const {
     switch (baseType) {
         case BaseType::Signed:
         case BaseType::Unsigned:
-        case BaseType::Pointer:
-        case BaseType::CodePointer:
 #if (defined SLJIT_64BIT_ARCHITECTURE && SLJIT_64BIT_ARCHITECTURE)
             if (width == 8)
                 return SLJIT_ARG_TYPE_W;
@@ -74,6 +72,10 @@ int Type::getSLJITType() const {
                 return SLJIT_ARG_TYPE_F32;
             else
                 return -1;
+
+        case BaseType::Pointer:
+        case BaseType::CodePointer:
+            return SLJIT_ARG_TYPE_P;
 
         default:
             return -1;
@@ -133,6 +135,12 @@ llvm::FunctionType *FunctionType::getLLVMFunctionType(
 ) const {
     // Get the argument types
     std::vector<llvm::Type *> params;
+
+#ifdef JITTEFEX_ENABLE_JIT_STACK_ARG
+    // First argument is the JIT stack
+    params.push_back(llvm::Type::getVoidTy(context)->getPointerTo());
+#endif
+
     for (auto &paramType : paramTypes)
         params.push_back(paramType.getLLVMType(context));
 
@@ -159,6 +167,13 @@ void *FunctionType::getSLJITType(void *scvp) const {
         return NULL;
 
     // Then the arg types
+#ifdef JITTEFEX_ENABLE_JIT_STACK_ARG
+    // First argument is the JIT stack
+    ret = sljit_marg_arg(sc, ret, SLJIT_ARG_TYPE_P);
+    if (!ret)
+        return NULL;
+#endif
+
     for (auto &type : paramTypes) {
         stype = type.getSLJITType();
         if (stype < 0)

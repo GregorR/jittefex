@@ -1,3 +1,6 @@
 [submodule "jittefex/sfjit-full"]
 	path = src/sfjit-full
 	url = https://github.com/GregorR/sfjit.git
+[submodule "src/ggggc"]
+	path = src/ggggc
+	url = https://github.com/GregorR/ggggc.git

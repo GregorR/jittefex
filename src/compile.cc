@@ -372,6 +372,16 @@ llvm::Expected<llvm::Value *> toLLVM(
 
             // Get the arguments
             std::vector<llvm::Value *> args;
+#ifdef JITTEFEX_ENABLE_JIT_STACK_ARG
+            {
+                // Start with the JIT stack
+                // FIXME: Allow the JIT stack to change
+                for (auto &a : func->args()) {
+                    args.push_back(&a);
+                    break;
+                }
+            }
+#endif
             for (auto *a : i->getArgs())
                 args.push_back(ic(a));
 
@@ -383,6 +393,9 @@ llvm::Expected<llvm::Value *> toLLVM(
         {
             auto i = (ArgInst *) instr;
             auto idx = i->getIdx();
+#ifdef JITTEFEX_ENABLE_JIT_STACK_ARG
+            idx++;
+#endif
             for (auto &arg : func->args()) {
                 if (idx == 0)
                     return &arg;

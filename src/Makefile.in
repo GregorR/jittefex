@@ -141,9 +141,9 @@ am__v_AR_1 =
 libjittefex_a_AR = $(AR) $(ARFLAGS)
 libjittefex_a_LIBADD =
 am_libjittefex_a_OBJECTS = libjittefex_a-builder.$(OBJEXT) \
-	libjittefex_a-compile.$(OBJEXT) libjittefex_a-ir.$(OBJEXT) \
-	libjittefex_a-jit.$(OBJEXT) libjittefex_a-sfjitLir.$(OBJEXT) \
-	libjittefex_a-type.$(OBJEXT)
+	libjittefex_a-compile.$(OBJEXT) libjittefex_a-ggggc.$(OBJEXT) \
+	libjittefex_a-ir.$(OBJEXT) libjittefex_a-jit.$(OBJEXT) \
+	libjittefex_a-sfjitLir.$(OBJEXT) libjittefex_a-type.$(OBJEXT)
 libjittefex_a_OBJECTS = $(am_libjittefex_a_OBJECTS)
 am_jittefex_config_OBJECTS = jittefex-config.$(OBJEXT)
 jittefex_config_OBJECTS = $(am_jittefex_config_OBJECTS)
@@ -166,6 +166,7 @@ am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/jittefex-config.Po \
 	./$(DEPDIR)/libjittefex_a-builder.Po \
 	./$(DEPDIR)/libjittefex_a-compile.Po \
+	./$(DEPDIR)/libjittefex_a-ggggc.Po \
 	./$(DEPDIR)/libjittefex_a-ir.Po \
 	./$(DEPDIR)/libjittefex_a-jit.Po \
 	./$(DEPDIR)/libjittefex_a-sfjitLir.Po \
@@ -320,14 +321,20 @@ top_srcdir = @top_srcdir@
 AUTOMAKE_OPTIONS = foreign
 lib_LIBRARIES = libjittefex.a
 libjittefex_a_SOURCES = \
-	builder.cc compile.cc ir.cc jit.cc sfjitLir.cc type.cc
+	builder.cc compile.cc ggggc.cc ir.cc jit.cc sfjitLir.cc type.cc
 
-libjittefex_a_CXXFLAGS = @LLVM_CXXFLAGS@ -std=c++17
+libjittefex_a_CXXFLAGS = @LLVM_CXXFLAGS@ -std=c++17 -I$(srcdir)/ggggc
 jittefex_config_SOURCES = jittefex-config.cc
 nobase_include_HEADERS = \
 	jittefex/builder.h jittefex/compile.h jittefex/Instruction.def \
 	jittefex/instruction.h jittefex/ir.h jittefex/jit.h jittefex/type.h \
-	jittefex/config.h
+	jittefex/config.h \
+	jittefex/ggggc/gc-gembc.h jittefex/ggggc/gc.h \
+	jittefex/ggggc/gc-portablems.h jittefex/ggggc/gen-barriers.h \
+	jittefex/ggggc/push.h jittefex/ggggc/thread-locals.h \
+	jittefex/ggggc/threads.h jittefex/ggggc/threads-macosx.h \
+	jittefex/ggggc/threads-none.h jittefex/ggggc/threads-posix.h \
+	jittefex/ggggc/threads-windows.h
 
 all: acconfig.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
@@ -470,6 +477,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/jittefex-config.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjittefex_a-builder.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjittefex_a-compile.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjittefex_a-ggggc.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjittefex_a-ir.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjittefex_a-jit.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libjittefex_a-sfjitLir.Po@am__quote@ # am--include-marker
@@ -522,6 +530,20 @@ libjittefex_a-compile.obj: compile.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='compile.cc' object='libjittefex_a-compile.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjittefex_a_CXXFLAGS) $(CXXFLAGS) -c -o libjittefex_a-compile.obj `if test -f 'compile.cc'; then $(CYGPATH_W) 'compile.cc'; else $(CYGPATH_W) '$(srcdir)/compile.cc'; fi`
+
+libjittefex_a-ggggc.o: ggggc.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjittefex_a_CXXFLAGS) $(CXXFLAGS) -MT libjittefex_a-ggggc.o -MD -MP -MF $(DEPDIR)/libjittefex_a-ggggc.Tpo -c -o libjittefex_a-ggggc.o `test -f 'ggggc.cc' || echo '$(srcdir)/'`ggggc.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libjittefex_a-ggggc.Tpo $(DEPDIR)/libjittefex_a-ggggc.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='ggggc.cc' object='libjittefex_a-ggggc.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjittefex_a_CXXFLAGS) $(CXXFLAGS) -c -o libjittefex_a-ggggc.o `test -f 'ggggc.cc' || echo '$(srcdir)/'`ggggc.cc
+
+libjittefex_a-ggggc.obj: ggggc.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjittefex_a_CXXFLAGS) $(CXXFLAGS) -MT libjittefex_a-ggggc.obj -MD -MP -MF $(DEPDIR)/libjittefex_a-ggggc.Tpo -c -o libjittefex_a-ggggc.obj `if test -f 'ggggc.cc'; then $(CYGPATH_W) 'ggggc.cc'; else $(CYGPATH_W) '$(srcdir)/ggggc.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libjittefex_a-ggggc.Tpo $(DEPDIR)/libjittefex_a-ggggc.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='ggggc.cc' object='libjittefex_a-ggggc.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjittefex_a_CXXFLAGS) $(CXXFLAGS) -c -o libjittefex_a-ggggc.obj `if test -f 'ggggc.cc'; then $(CYGPATH_W) 'ggggc.cc'; else $(CYGPATH_W) '$(srcdir)/ggggc.cc'; fi`
 
 libjittefex_a-ir.o: ir.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libjittefex_a_CXXFLAGS) $(CXXFLAGS) -MT libjittefex_a-ir.o -MD -MP -MF $(DEPDIR)/libjittefex_a-ir.Tpo -c -o libjittefex_a-ir.o `test -f 'ir.cc' || echo '$(srcdir)/'`ir.cc
@@ -734,6 +756,7 @@ distclean: distclean-am
 		-rm -f ./$(DEPDIR)/jittefex-config.Po
 	-rm -f ./$(DEPDIR)/libjittefex_a-builder.Po
 	-rm -f ./$(DEPDIR)/libjittefex_a-compile.Po
+	-rm -f ./$(DEPDIR)/libjittefex_a-ggggc.Po
 	-rm -f ./$(DEPDIR)/libjittefex_a-ir.Po
 	-rm -f ./$(DEPDIR)/libjittefex_a-jit.Po
 	-rm -f ./$(DEPDIR)/libjittefex_a-sfjitLir.Po
@@ -786,6 +809,7 @@ maintainer-clean: maintainer-clean-am
 		-rm -f ./$(DEPDIR)/jittefex-config.Po
 	-rm -f ./$(DEPDIR)/libjittefex_a-builder.Po
 	-rm -f ./$(DEPDIR)/libjittefex_a-compile.Po
+	-rm -f ./$(DEPDIR)/libjittefex_a-ggggc.Po
 	-rm -f ./$(DEPDIR)/libjittefex_a-ir.Po
 	-rm -f ./$(DEPDIR)/libjittefex_a-jit.Po
 	-rm -f ./$(DEPDIR)/libjittefex_a-sfjitLir.Po

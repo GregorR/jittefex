@@ -76,6 +76,14 @@ void IRBuilder::setInsertPoint(BasicBlock *to)
 
             // Load all the arguments
             if (f->sljitCompiler) {
+#ifdef JITTEFEX_ENABLE_JIT_STACK_ARG
+                reg = SLJIT_S0;
+                off = 0;
+                sljit_emit_get_marg(
+                    sc, SLJIT_ARG_TYPE_P, reg, &reg, &off);
+                f->sljitArgLocs.push_back(SLJITLocation{reg, off});
+#endif
+
                 for (auto &type : f->getFunctionType()->getParamTypes()) {
                     stype = type.getSLJITType();
                     if (stype < 0) {
@@ -91,6 +99,12 @@ void IRBuilder::setInsertPoint(BasicBlock *to)
                 }
             }
 
+            // Mark all the registers as free
+            for (int i = 0; i < SLJIT_NUMBER_OF_REGISTERS - 1 /* one for our own use */; i++)
+                f->sljitRegs.push_back(false);
+            for (int i = 0; i < SLJIT_NUMBER_OF_FLOAT_REGISTERS; i++)
+                f->sljitFRegs.push_back(false);
+
             // Make the alloca for later filling
             if (f->sljitCompiler)
                 f->sljitAlloca = sljit_emit_alloca(sc, 0);
@@ -99,41 +113,63 @@ void IRBuilder::setInsertPoint(BasicBlock *to)
             if (f->sljitCompiler) {
                 argIdx = 0;
                 for (auto &type : f->getFunctionType()->getParamTypes()) {
+#ifdef JITTEFEX_ENABLE_JIT_STACK_ARG
+                    /* First argument (the stack pointer) should stay in a
+                     * register */
+                    if (argIdx == 0) {
+                        argIdx++;
+                        continue;
+                    }
+#endif
+
                     auto &loc = f->sljitArgLocs[argIdx++];
                     if (loc.reg & SLJIT_MEM)
                         continue;
-                    reg = SLJIT_MEM1(SLJIT_FRAMEP);
-                    off = -sizeof(sljit_f64) - f->sljitStack.size() * sizeof(sljit_f64);
-                    stype = type.getSLJITType();
+
+                    // Get a new stack location
+                    SLJITLocation newLoc;
+                    if (!f->sljitAllocateStack(newLoc)) {
+                        f->cancelSLJIT();
+                        break;
+                    }
+
+                    // Move it there
                     if (stype < SLJIT_ARG_TYPE_F64) {
                         // Word-like
                         if (sljit_emit_op1(sc, SLJIT_MOV,
-                            reg, off, loc.reg, loc.off)) {
+                            newLoc.reg, newLoc.off, loc.reg, loc.off)) {
                             f->cancelSLJIT();
                             break;
                         }
                     } else {
                         // Float-like
                         if (sljit_emit_fop1(sc, SLJIT_MOV_F64,
-                            reg, off, loc.reg, loc.off)) {
+                            newLoc.reg, newLoc.off, loc.reg, loc.off)) {
                             f->cancelSLJIT();
                             break;
                         }
                     }
-                    loc.reg = reg;
-                    loc.off = off;
-                    f->sljitStack.push_back(true);
+                    loc = newLoc;
                 }
             }
 
-            // And mark all the registers as free
-            for (int i = 0; i < SLJIT_NUMBER_OF_REGISTERS - 1 /* one for our own use */; i++)
-                f->sljitRegs.push_back(false);
-            for (int i = 0; i < SLJIT_NUMBER_OF_FLOAT_REGISTERS; i++)
-                f->sljitFRegs.push_back(false);
-
             f->sljitInit = true;
         }
+
+#ifdef JITTEFEX_ENABLE_JIT_STACK_ARG
+        {
+            // Move the JIT stack pointer to a saved location
+            SLJITLocation &spLoc = f->sljitArgLocs[0];
+            if (spLoc.reg != SLJIT_S0) {
+                if (sljit_emit_op1(sc, SLJIT_MOV, SLJIT_S0, 0,
+                    spLoc.reg, spLoc.off))
+                    f->cancelSLJIT();
+                spLoc.reg = SLJIT_S0;
+                spLoc.off = 0;
+            }
+            f->sljitRegs[0] = true;
+        }
+#endif
 
         // Set this label
         if (f->sljitCompiler) {
@@ -932,7 +968,7 @@ Instruction *IRBuilder::createCall(
         SLJITLocation loc, floc;
         bool flocAllocated = false;
         sljit_s32 wordR, floatR, stackSpace,
-            argI, wordI, floatI, stackI;
+            paramI, argI, wordI, floatI, stackI;
         std::unordered_map<sljit_s32, SLJITLocation> regMap;
         std::unordered_map<sljit_s32, SLJITLocation> fregMap;
 
@@ -1006,17 +1042,30 @@ Instruction *IRBuilder::createCall(
 
         }
 
-        // Get them into place
+        // Get the arguments into place
         if (stackSpace) {
             alloc = sljit_emit_alloca(sc, stackSpace);
             if (!alloc)
                 SCANCEL();
         }
-        argI = wordI = floatI = stackI = 0;
+
+#ifdef JITTEFEX_ENABLE_JIT_STACK_ARG
+        // JIT stack first
+        if (sljit_emit_marg_mov(sc, marg, 0, SLJIT_S0, 0))
+            SCANCEL();
+#endif
+
+        argI = floatI = stackI = 0;
+#ifdef JITTEFEX_ENABLE_JIT_STACK_ARG
+        paramI = wordI = 1;
+#else
+        paramI = wordI = 0;
+#endif
         for (auto &type : fTy->getParamTypes()) {
             sljit_s32 op;
             bool flt = false;
             loc = args[argI++]->sljitLoc;
+            paramI++;
             int stype = type.getSLJITType();
 
             switch (stype) {
@@ -1061,7 +1110,7 @@ Instruction *IRBuilder::createCall(
             if (flt) {
                 if (floatI++ >= floatR) {
                     // Goes in memory
-                    if (sljit_emit_marg_mov(sc, marg, argI - 1,
+                    if (sljit_emit_marg_mov(sc, marg, paramI - 1,
                         loc.reg, loc.off))
                         SCANCEL();
                 } else {
@@ -1073,7 +1122,7 @@ Instruction *IRBuilder::createCall(
             } else {
                 if (wordI++ >= wordR) {
                     // Goes in memory
-                    if (sljit_emit_marg_mov(sc, marg, argI - 1,
+                    if (sljit_emit_marg_mov(sc, marg, paramI - 1,
                         loc.reg, loc.off))
                         SCANCEL();
                 } else {
@@ -1147,7 +1196,11 @@ Instruction *IRBuilder::createArg(int idx) {
 
 #ifdef JITTEFEX_USE_SFJIT
     SJ {
-        ret->sljitLoc = f->sljitArgLocs[idx];
+        ret->sljitLoc = f->sljitArgLocs[idx
+#ifdef JITTEFEX_ENABLE_JIT_STACK_ARG
+            + 1
+#endif
+        ];
     }
 #endif
 
