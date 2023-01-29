@@ -6,11 +6,21 @@
  * See LICENSE for license information.
  */
 
-#include "jittefex/config.h"
+#define _DEFAULT_SOURCE
+
+#include "jittefex/gc.h"
+
+#undef _DEFAULT_SOURCE
 
 extern "C" {
 #include "ggggc/allocator.c"
-#include "ggggc/collector/gembc.c"
+#define STRINGIFY(x) #x
+#define COLLECTOR_F2(x) STRINGIFY(ggggc/collector/x.c)
+#define COLLECTOR_F COLLECTOR_F2(GGGGC_COLLECTOR)
+#include COLLECTOR_F
+#undef COLLECTOR_F
+#undef COLLECTOR_F2
+#undef STRINGIFY
 #include "ggggc/globals.c"
 #include "ggggc/roots.c"
 #include "ggggc/threads.c"
