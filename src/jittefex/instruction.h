@@ -71,20 +71,16 @@ enum Opcode {
 #define  FIRST_OTHER_INST(N)             OtherOpsBegin = N,
 #define HANDLE_OTHER_INST(N, OPC, CLASS) OPC = N,
 #define   LAST_OTHER_INST(N)             OtherOpsEnd = N+1,
+#define  FIRST_META_INST(N) MetaOpsBegin = N,
+#define HANDLE_META_INST(N, OPC, CLASS) OPC = N,
+#define   LAST_META_INST(N) MetaOpsEnd = N+1,
+#define  FIRST_GC_INST(N) GCOpsBegin = N,
+#define HANDLE_GC_INST(N, OPC, CLASS) OPC = N,
+#define   LAST_GC_INST(N) GCOpsEnd = N+1,
+#define  FIRST_LITERAL_INST(N) LiteralOpsBegin = N,
+#define HANDLE_LITERAL_INST(N, OPC, CLASS) OPC = N,
+#define   LAST_LITERAL_INST(N) LiteralOpsEnd = N+1,
 #include "Instruction.def"
-
-    MetaOpsBegin = 1100,
-    Arg = 1101,
-    MetaOpsEnd = 1102,
-
-    LiteralOpsBegin = 1200,
-    SLiteral = 1201,
-    ULiteral = 1202,
-    FLiteral = 1203,
-    PLiteral = 1204,
-    FuncLiteral = 1205,
-    CodeLiteral = 1206,
-    LiteralOpsEnd = 1207
 };
 
 #define J_GETTERS(type, nameU, nameL) \

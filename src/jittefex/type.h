@@ -35,7 +35,20 @@ enum BaseType {
      * a different type to enforce this step if you need it. */
     Stack,
 
+    /* Equivalent special type for GCAlloca. In the case of GCAlloca, getting
+     * the actual pointer is simply not allowed. */
+    GCStack,
+
+    // Non-GC'd pointer
     Pointer,
+
+    // Definitely GC'd pointer
+    GCPointer,
+
+    // Tagged thing that may or may not be GC'd, depending on the tag
+    TaggedWord,
+
+    // Pointer to machine code
     CodePointer
 };
 
@@ -88,8 +101,20 @@ class Type {
             return Type{BaseType::Stack, 0};
         }
 
+        static inline Type gcStackType() {
+            return Type{BaseType::GCStack, 0};
+        }
+
         static inline Type pointerType() {
             return Type{BaseType::Pointer, sizeof(void *)};
+        }
+
+        static inline Type gcPointerType() {
+            return Type{BaseType::GCPointer, sizeof(void *)};
+        }
+
+        static inline Type taggedWordType() {
+            return Type{BaseType::TaggedWord, sizeof(void *)};
         }
 
         static inline Type codePointerType() {

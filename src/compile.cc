@@ -24,6 +24,7 @@
 #include "sfjit/sljitLir.h"
 #if !(defined SLJIT_CONFIG_UNSUPPORTED && SLJIT_CONFIG_UNSUPPORTED)
 #define JITTEFEX_USE_SFJIT 1
+#define SLJIT_GCSP SLJIT_S0
 #endif
 #endif
 
@@ -57,6 +58,67 @@ void *compile(Function *func) {
         if (sljit_set_alloca(sc, (struct sljit_alloca *) func->sljitAlloca,
             func->sljitStack.size() * sizeof(sljit_f64)))
             sc = nullptr;
+
+#ifdef JITTEFEX_ENABLE_GC_STACK
+        // Allocate GC space
+        if (sc) {
+            sljit_sw len = func->sljitGCStack.size();
+            sljit_sw size = len;
+            if (size) do {
+                // Allocate the space
+#ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
+                size = size + (size + sizeof(sljit_sw) - 1) / sizeof(sljit_sw);
+#endif
+                size *= sizeof(sljit_sw);
+                struct sljit_label *lbl = sljit_emit_label(sc);
+                sljit_set_label((struct sljit_jump *) func->sljitGCAllocaOut, lbl);
+                if (sljit_emit_op2(sc, SLJIT_SUB, SLJIT_GCSP, 0, SLJIT_GCSP, 0,
+                    SLJIT_IMM, size)) {
+                    sc = nullptr;
+                    break;
+                }
+
+                // And make it safe
+#ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
+                // By tagging it all harmlessly
+                sljit_sw off;
+                off = 0;
+                while (len > 0) {
+                    sljit_sw tagw = 0;
+                    for (sljit_sw el = 0; el < sizeof(sljit_sw); el++)
+                        tagw |= 0xFD << el;
+                    if (len < sizeof(sljit_sw))
+                        tagw |= 0xFF << len; // terminus tag
+                    if (sljit_emit_op1(sc, SLJIT_MOV, SLJIT_MEM1(SLJIT_GCSP), off,
+                        SLJIT_IMM, tagw)) {
+                        sc = nullptr;
+                        break;
+                    }
+                    len -= sizeof(sljit_sw);
+                    off += sizeof(sljit_sw) * (sizeof(sljit_sw) + 1);
+                }
+#else
+                // By zeroing it
+                for (sljit_sw off = 0; off < size; off += sizeof(sljit_sw)) {
+                    if (sljit_emit_op1(sc, SLJIT_MOV, SLJIT_MEM1(SLJIT_GCSP), off,
+                        SLJIT_IMM, 0)) {
+                        sc = nullptr;
+                        break;
+                    }
+                }
+#endif
+            } while (false);
+        }
+
+        // And go back again
+        if (sc) {
+            struct sljit_jump *retJmp = sljit_emit_jump(sc, SLJIT_JUMP);
+            if (retJmp)
+                sljit_set_label(retJmp, (struct sljit_label *) func->sljitGCAllocaIn);
+            else
+                sc = nullptr;
+        }
+#endif
 
         // Handle all labels
         if (sc) {
@@ -372,7 +434,7 @@ llvm::Expected<llvm::Value *> toLLVM(
 
             // Get the arguments
             std::vector<llvm::Value *> args;
-#ifdef JITTEFEX_ENABLE_JIT_STACK_ARG
+#ifdef JITTEFEX_ENABLE_GC_STACK
             {
                 // Start with the JIT stack
                 // FIXME: Allow the JIT stack to change
@@ -393,7 +455,7 @@ llvm::Expected<llvm::Value *> toLLVM(
         {
             auto i = (ArgInst *) instr;
             auto idx = i->getIdx();
-#ifdef JITTEFEX_ENABLE_JIT_STACK_ARG
+#ifdef JITTEFEX_ENABLE_GC_STACK
             idx++;
 #endif
             for (auto &arg : func->args()) {

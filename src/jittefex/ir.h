@@ -80,6 +80,11 @@ class Function {
         void *sljitAlloca = nullptr; // actually struct sljit_alloca *
         bool sljitInit = false;
 
+#ifdef JITTEFEX_ENABLE_GC_STACK
+        void *sljitGCAllocaOut = nullptr; // actually struct sljit_jump *
+        void *sljitGCAllocaIn = nullptr; // actually struct sljit_label *
+#endif
+
         // Where the arguments are stored
         std::vector<SLJITLocation> sljitArgLocs;
 
@@ -92,6 +97,11 @@ class Function {
         // Stack memory, in terms of negative offsets from FRAMEP
         std::vector<bool> sljitStack;
 
+#ifdef JITTEFEX_ENABLE_GC_STACK
+        // GC stack memory, positive offsets
+        std::vector<bool> sljitGCStack;
+#endif
+
         /**
          * Allocate a register (or any other space).
          */
@@ -101,6 +111,13 @@ class Function {
          * Allocate specifically stack space.
          */
         bool sljitAllocateStack(SLJITLocation &loc);
+
+#ifdef JITTEFEX_ENABLE_GC_STACK
+        /**
+         * Allocate a GC stack space.
+         */
+        bool sljitAllocateGCStack(SLJITLocation &loc);
+#endif
 
         /**
          * Release a register or stack space.

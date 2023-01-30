@@ -40,6 +40,8 @@ llvm::Type *Type::getLLVMType(llvm::LLVMContext &context) const {
         case BaseType::CodePointer:
             return llvm::Type::getVoidTy(context)->getPointerTo();
 
+        /* GCPointer and TaggedWord are intentionally included here, because
+         * they must be converted to be safely used */
         default:
             abort();
     }
@@ -77,6 +79,8 @@ int Type::getSLJITType() const {
         case BaseType::CodePointer:
             return SLJIT_ARG_TYPE_P;
 
+        /* GCPointer and TaggedWord are intentionally included here, because
+         * they must be converted to be safely used */
         default:
             return -1;
     }
@@ -136,13 +140,18 @@ llvm::FunctionType *FunctionType::getLLVMFunctionType(
     // Get the argument types
     std::vector<llvm::Type *> params;
 
-#ifdef JITTEFEX_ENABLE_JIT_STACK_ARG
+#ifdef JITTEFEX_ENABLE_GC_STACK
     // First argument is the JIT stack
     params.push_back(llvm::Type::getVoidTy(context)->getPointerTo());
 #endif
 
-    for (auto &paramType : paramTypes)
+    for (auto &paramType : paramTypes) {
+        if (paramType.getBaseType() == BaseType::GCPointer ||
+            paramType.getBaseType() == BaseType::TaggedWord) {
+            continue;
+        }
         params.push_back(paramType.getLLVMType(context));
+    }
 
     // And the return type
     llvm::Type *ret = returnType.getLLVMType(context);
@@ -167,7 +176,7 @@ void *FunctionType::getSLJITType(void *scvp) const {
         return NULL;
 
     // Then the arg types
-#ifdef JITTEFEX_ENABLE_JIT_STACK_ARG
+#ifdef JITTEFEX_ENABLE_GC_STACK
     // First argument is the JIT stack
     ret = sljit_marg_arg(sc, ret, SLJIT_ARG_TYPE_P);
     if (!ret)
@@ -175,9 +184,15 @@ void *FunctionType::getSLJITType(void *scvp) const {
 #endif
 
     for (auto &type : paramTypes) {
+        if (type.getBaseType() == BaseType::GCPointer ||
+            type.getBaseType() == BaseType::TaggedWord) {
+            continue;
+        }
+
         stype = type.getSLJITType();
         if (stype < 0)
             return NULL;
+
         ret = sljit_marg_arg(sc, ret, stype);
         if (!ret)
             return NULL;

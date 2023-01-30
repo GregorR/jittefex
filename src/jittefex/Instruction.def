@@ -1,5 +1,10 @@
 //===-- llvm/Instruction.def - File that describes Instructions -*- C++ -*-===//
 //
+// Modified for use by Jittefex. Jittefex's instructions are based directly on
+// LLVM's instructions, so LLVM's Instruction.def is used as a baseline. The
+// below license text is from LLVM's Instruction.def, and Jittefex is under the
+// same license.
+//
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
@@ -119,6 +124,48 @@
 #define HANDLE_USER_INST(num, opc, Class) HANDLE_OTHER_INST(num, opc, Class)
 #endif
 
+#ifndef FIRST_META_INST
+#define FIRST_META_INST(num)
+#endif
+#ifndef HANDLE_META_INST
+#ifndef HANDLE_INST
+#define HANDLE_META_INST(num, opcode, Class)
+#else
+#define HANDLE_META_INST(num, opcode, Class) HANDLE_INST(num, opcode, Class)
+#endif
+#endif
+#ifndef LAST_META_INST
+#define LAST_META_INST(num)
+#endif
+
+#ifndef FIRST_GC_INST
+#define FIRST_GC_INST(num)
+#endif
+#ifndef HANDLE_GC_INST
+#ifndef HANDLE_INST
+#define HANDLE_GC_INST(num, opcode, Class)
+#else
+#define HANDLE_GC_INST(num, opcode, Class) HANDLE_INST(num, opcode, Class)
+#endif
+#endif
+#ifndef LAST_GC_INST
+#define LAST_GC_INST(num)
+#endif
+
+#ifndef FIRST_LITERAL_INST
+#define FIRST_LITERAL_INST(num)
+#endif
+#ifndef HANDLE_LITERAL_INST
+#ifndef HANDLE_INST
+#define HANDLE_LITERAL_INST(num, opcode, Class)
+#else
+#define HANDLE_LITERAL_INST(num, opcode, Class) HANDLE_INST(num, opcode, Class)
+#endif
+#endif
+#ifndef LAST_LITERAL_INST
+#define LAST_LITERAL_INST(num)
+#endif
+
 // Terminator Instructions - These instructions are used to terminate a basic
 // block of the program.   Every basic block must end with one of these
 // instructions for it to be a well formed basic block.
@@ -220,6 +267,30 @@ HANDLE_OTHER_INST(66, LandingPad, LandingPadInst)  // Landing pad instruction.
 HANDLE_OTHER_INST(67, Freeze, FreezeInst) // Freeze instruction.
   LAST_OTHER_INST(67)
 
+// Meta-operations
+ FIRST_META_INST(1100)
+HANDLE_META_INST(1100, Arg      , ArgInst       )
+  LAST_META_INST(1100)
+
+// GC-related instructions
+ FIRST_GC_INST(1200)
+HANDLE_GC_INST(1200, GCYield    , Instruction   )
+HANDLE_GC_INST(1201, GCAlloca   , AllocaInst    )
+HANDLE_GC_INST(1202, GCLoad     , LoadInst      )
+HANDLE_GC_INST(1203, GCLoadTag  , LoadInst      )
+HANDLE_GC_INST(1204, GCStore    , StoreInst     )
+HANDLE_GC_INST(1205, GCStoreTag , StoreInst     )
+  LAST_GC_INST(1205)
+
+ FIRST_LITERAL_INST(1300)
+HANDLE_LITERAL_INST(1300, SLiteral      , LiteralInst       )
+HANDLE_LITERAL_INST(1301, ULiteral      , LiteralInst       )
+HANDLE_LITERAL_INST(1302, FLiteral      , LiteralInst       )
+HANDLE_LITERAL_INST(1303, PLiteral      , LiteralInst       )
+HANDLE_LITERAL_INST(1304, FuncLiteral   , FuncLiteralInst   )
+HANDLE_LITERAL_INST(1305, CodeLiteral   , CodeLiteralInst   )
+  LAST_LITERAL_INST(1305)
+
 #undef  FIRST_TERM_INST
 #undef HANDLE_TERM_INST
 #undef   LAST_TERM_INST
@@ -249,6 +320,18 @@ HANDLE_OTHER_INST(67, Freeze, FreezeInst) // Freeze instruction.
 #undef   LAST_OTHER_INST
 
 #undef HANDLE_USER_INST
+
+#undef  FIRST_META_INST
+#undef HANDLE_META_INST
+#undef   LAST_META_INST
+
+#undef  FIRST_GC_INST
+#undef HANDLE_GC_INST
+#undef   LAST_GC_INST
+
+#undef  FIRST_LITERAL_INST
+#undef HANDLE_LITERAL_INST
+#undef   LAST_LITERAL_INST
 
 #ifdef HANDLE_INST
 #undef HANDLE_INST

@@ -65,7 +65,7 @@ bool Function::sljitAllocateRegister(bool flt, SLJITLocation &loc) {
 }
 
 bool Function::sljitAllocateStack(SLJITLocation &loc) {
-    // No free registers, look for stack space
+    // Look for stack space
     for (int i = 0; i < sljitStack.size(); i++) {
 	if (!sljitStack[i]) {
 	    sljitStack[i] = true;
@@ -81,6 +81,37 @@ bool Function::sljitAllocateStack(SLJITLocation &loc) {
     sljitStack.push_back(true);
     return true;
 }
+
+#ifdef JITTEFEX_ENABLE_GC_STACK
+bool Function::sljitAllocateGCStack(SLJITLocation &loc) {
+    sljit_sw off = -1;
+    for (int i = 0; i < sljitGCStack.size(); i++) {
+        if (!sljitGCStack[i]) {
+            off = i;
+            sljitGCStack[i] = true;
+            break;
+        }
+    }
+
+    if (off < 0) {
+        // Didn't find free space, so make it
+        off = sljitGCStack.size();
+        sljitGCStack.push_back(true);
+    }
+
+#ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
+    // Stack goes (tag word) (one word per sizeof word) (tag word) ...
+    {
+        sljit_sw sub = off % sizeof(sljit_sw);
+        off = off / sizeof(sljit_sw) * (sizeof(sljit_sw) + 1) + sub + 1;
+    }
+#endif
+    off *= sizeof(sljit_sw);
+    loc.reg = SLJIT_MEM1(SLJIT_S0);
+    loc.off = off;
+    return true;
+}
+#endif
 
 void Function::sljitReleaseRegister(bool flt, const SLJITLocation &loc) {
     // Check if it actually is a register
@@ -98,6 +129,20 @@ void Function::sljitReleaseRegister(bool flt, const SLJITLocation &loc) {
             return;
         }
     }
+
+#ifdef JITTEFEX_ENABLE_GC_STACK
+    if (loc.reg == SLJIT_MEM1(SLJIT_S0)) {
+        // It's on the GC stack
+        sljit_sw off = loc.off / sizeof(sljit_sw);
+#ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
+        // Stack goes (tag word) (one word per sizeof word) (tag word) ...
+        sljit_sw sub = off % (sizeof(sljit_sw) + 1) - 1;
+        off = off / (sizeof(sljit_sw) + 1) * sizeof(sljit_sw) + sub;
+#endif
+        sljitGCStack[off] = false;
+        return;
+    }
+#endif
 
     // It's on the stack, which means its offset is -f64 - i * f64
     sljit_sw off = -(loc.off + sizeof(sljit_f64)) / sizeof(sljit_f64);
