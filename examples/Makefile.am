@@ -1,6 +1,6 @@
 AUTOMAKE_OPTIONS=foreign
 
-bin_PROGRAMS=jittefex-kaleidoscope jittefex-kaleidoscope-int
+noinst_PROGRAMS=jittefex-kaleidoscope jittefex-kaleidoscope-int
 
 jittefex_kaleidoscope_SOURCES=toy.cc
 jittefex_kaleidoscope_CXXFLAGS=@LLVM_CXXFLAGS@ \
@@ -14,5 +14,5 @@ jittefex_kaleidoscope_int_CXXFLAGS=@LLVM_CXXFLAGS@ \
 jittefex_kaleidoscope_int_LDFLAGS=@LLVM_LDFLAGS@
 jittefex_kaleidoscope_int_LDADD=../src/libjittefex-nogc.a @LLVM_LIBS@
 
-../src/libjittefex.a:
-	cd ../src ; $(MAKE) libjittefex.a
+../src/libjittefex-nogc.a:
+	cd ../src ; $(MAKE) libjittefex-nogc.a
