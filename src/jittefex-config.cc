@@ -75,19 +75,22 @@ int main(int argc, char **argv) {
         std::cout << "-I" << JITTEFEX_PREFIX << "/include/jittefex/config-";
         if (nogc)
             std::cout << "no";
-        std::cout << "gc -I" << JITTEFEX_PREFIX << "/include" << std::endl;
+        std::cout << "gc -I" << JITTEFEX_PREFIX << "/include ";
     }
     if (ldflags)
-        std::cout << "-L" << JITTEFEX_PREFIX << "/lib" << std::endl;
+        std::cout << "-L" << JITTEFEX_PREFIX << "/lib ";
     if (libs) {
         std::cout << "-ljittefex";
         if (nogc)
             std::cout << "-nogc";
-        std::cout << std::endl;
+        std::cout << " ";
     }
+    std::cout << std::flush;
 
-    if (!cflags && !cxxflags && !ldflags && !systemLibs && !libs)
+    if (!cflags && !cxxflags && !ldflags && !systemLibs && !libs) {
+        std::cout << std::endl;
         return 0;
+    }
 
     // Then pass them thru to llvm-config
 #ifdef JITTEFEX_HAVE_LLVM
@@ -116,6 +119,9 @@ int main(int argc, char **argv) {
         return 1;
     }
     waitpid(pid, nullptr, 0);
+
+#else
+    std::cout << std::endl;
 
 #endif
 
