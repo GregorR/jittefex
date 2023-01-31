@@ -93,8 +93,10 @@ int main(int argc, char **argv) {
 #ifdef JITTEFEX_HAVE_LLVM
     std::vector<std::string> llvmConfigFlags;
     llvmConfigFlags.push_back("llvm-config");
-    for (int ai = 1; ai < argc; ai++)
-        llvmConfigFlags.push_back(argv[ai]);
+    for (int ai = 1; ai < argc; ai++) {
+        if (std::string(argv[ai]) != "--nogc")
+            llvmConfigFlags.push_back(argv[ai]);
+    }
     if (systemLibs || libs) {
         llvmConfigFlags.push_back("core");
         llvmConfigFlags.push_back("orcjit");
