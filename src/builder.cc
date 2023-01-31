@@ -24,12 +24,10 @@
 
 #include <cassert>
 
-#ifdef JITTEFEX_HAVE_LLVM
 #ifdef JITTEFEX_ENABLE_DEBUG
 #define NAME , name
 #else
 #define NAME
-#endif
 #endif
 
 #ifdef JITTEFEX_HAVE_SFJIT

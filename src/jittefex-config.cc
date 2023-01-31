@@ -24,6 +24,7 @@ void usage() {
         "Options:" << std::endl <<
         "  --version\tPrint Jittefex version." << std::endl <<
         "  --prefix\tPrint the installation prefix." << std::endl <<
+        "  --cflags\tC compiler flags." << std::endl <<
         "  --cxxflags\tC++ compiler flags." << std::endl <<
         "  --ldflags\tLinker flags." << std::endl <<
         "  --system-libs\tSystem libraries needed to link against Jittefex." << std::endl <<
@@ -33,6 +34,7 @@ void usage() {
 int main(int argc, char **argv) {
     bool version = false,
          prefix = false,
+         cflags = false,
          cxxflags = false,
          ldflags = false,
          systemLibs = false,
@@ -44,6 +46,8 @@ int main(int argc, char **argv) {
             version = true;
         else if (arg == "--prefix")
             prefix = true;
+        else if (arg == "--cflags")
+            cflags = true;
         else if (arg == "--cxxflags")
             cxxflags = true;
         else if (arg == "--ldflags")
@@ -63,14 +67,14 @@ int main(int argc, char **argv) {
         std::cout << JITTEFEX_VERSION << std::endl;
     if (prefix)
         std::cout << JITTEFEX_PREFIX << std::endl;
-    if (cxxflags)
+    if (cflags || cxxflags)
         std::cout << "-I" << JITTEFEX_PREFIX << "/include" << std::endl;
     if (ldflags)
         std::cout << "-L" << JITTEFEX_PREFIX << "/lib" << std::endl;
     if (libs)
         std::cout << "-ljittefex" << std::endl;
 
-    if (!cxxflags && !ldflags && !systemLibs && !libs)
+    if (!cflags && !cxxflags && !ldflags && !systemLibs && !libs)
         return 0;
 
     // Then pass them thru to llvm-config
@@ -100,9 +104,6 @@ int main(int argc, char **argv) {
     waitpid(pid, nullptr, 0);
 
 #endif
-
-    if (cxxflags)
-        std::cout << "-std=c++17" << std::endl;
 
     return 0;
 }

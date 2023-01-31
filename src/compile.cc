@@ -107,7 +107,12 @@ void *compile(Function *func) {
                     }
                 }
 #endif
-            } while (false);
+            } while (false); else {
+                /* No space to allocate, so just ignore the jump */
+                sljit_set_label((struct sljit_jump *) func->sljitGCAllocaOut,
+                    (struct sljit_label *) func->sljitGCAllocaIn);
+
+            }
         }
 
         // And go back again

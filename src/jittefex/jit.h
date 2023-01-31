@@ -11,6 +11,17 @@
 
 #include "jittefex/config.h"
 
+// TL Optional doesn't support nothrow
+#include <cstdlib>
+#include <exception>
+#include <functional>
+#include <new>
+#include <type_traits>
+#include <utility>
+#define throw if (true) abort(); else
+#include "tl/optional.hpp"
+#undef throw
+
 #ifdef JITTEFEX_HAVE_LLVM
 #include "llvm/ExecutionEngine/Orc/Core.h"
 #include "llvm/ExecutionEngine/Orc/IRCompileLayer.h"
@@ -22,7 +33,6 @@
 #endif
 
 #include <memory>
-#include <optional>
 
 namespace jittefex {
 
@@ -69,7 +79,7 @@ class Jittefex {
         /**
          * Create a Jittefex instance.
          */
-        static std::optional<std::unique_ptr<Jittefex>> create();
+        static tl::optional<std::unique_ptr<Jittefex>> create();
 
 #ifdef JITTEFEX_HAVE_LLVM
         inline const llvm::DataLayout &getDataLayout() const { return dl; }

@@ -4,3 +4,6 @@
 [submodule "src/ggggc"]
 	path = src/ggggc
 	url = https://github.com/GregorR/ggggc.git
+[submodule "src/optional"]
+	path = src/optional
+	url = https://github.com/TartanLlama/optional.git

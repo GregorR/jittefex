@@ -70,11 +70,11 @@ Jittefex::~Jittefex() {
 #endif
 }
 
-std::optional<std::unique_ptr<Jittefex>> Jittefex::create() {
+tl::optional<std::unique_ptr<Jittefex>> Jittefex::create() {
 #ifdef JITTEFEX_HAVE_LLVM
     auto epc = llvm::orc::SelfExecutorProcessControl::Create();
     if (!epc)
-        return std::nullopt;
+        return tl::nullopt;
 
     auto es = std::make_unique<llvm::orc::ExecutionSession>(std::move(*epc));
 
@@ -83,7 +83,7 @@ std::optional<std::unique_ptr<Jittefex>> Jittefex::create() {
 
     auto dl = jtmb.getDefaultDataLayoutForTarget();
     if (!dl)
-        return std::nullopt;
+        return tl::nullopt;
 
     return std::make_unique<Jittefex>(
         std::move(es), std::move(jtmb), std::move(*dl));
