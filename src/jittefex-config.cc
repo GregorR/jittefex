@@ -25,6 +25,7 @@ void usage() {
         "  --version\tPrint Jittefex version." << std::endl <<
         "  --prefix\tPrint the installation prefix." << std::endl <<
         "  --nogc\tUse a version of Jittefex with no GC support." << std::endl <<
+        "  --notag\tUse an untagged (precise) GC." << std::endl <<
         "  --cflags\tC compiler flags." << std::endl <<
         "  --cxxflags\tC++ compiler flags." << std::endl <<
         "  --ldflags\tLinker flags." << std::endl <<
@@ -36,6 +37,7 @@ int main(int argc, char **argv) {
     bool version = false,
          prefix = false,
          nogc = false,
+         notag = false,
          cflags = false,
          cxxflags = false,
          ldflags = false,
@@ -50,6 +52,8 @@ int main(int argc, char **argv) {
             prefix = true;
         else if (arg == "--nogc")
             nogc = true;
+        else if (arg == "--notag")
+            notag = true;
         else if (arg == "--cflags")
             cflags = true;
         else if (arg == "--cxxflags")
@@ -74,8 +78,12 @@ int main(int argc, char **argv) {
     if (cflags || cxxflags) {
         std::cout << "-I" << JITTEFEX_PREFIX << "/include/jittefex/config-";
         if (nogc)
-            std::cout << "no";
-        std::cout << "gc -I" << JITTEFEX_PREFIX << "/include ";
+            std::cout << "nogc";
+        else if (notag)
+            std::cout << "notag";
+        else
+            std::cout << "gc";
+        std::cout << " -I" << JITTEFEX_PREFIX << "/include ";
     }
     if (ldflags)
         std::cout << "-L" << JITTEFEX_PREFIX << "/lib ";
@@ -83,6 +91,8 @@ int main(int argc, char **argv) {
         std::cout << "-ljittefex";
         if (nogc)
             std::cout << "-nogc";
+        else if (notag)
+            std::cout << "-notag";
         std::cout << " ";
     }
     std::cout << std::flush;
@@ -97,7 +107,8 @@ int main(int argc, char **argv) {
     std::vector<std::string> llvmConfigFlags;
     llvmConfigFlags.push_back("llvm-config");
     for (int ai = 1; ai < argc; ai++) {
-        if (std::string(argv[ai]) != "--nogc")
+        std::string arg = argv[ai];
+        if (arg != "--nogc" && arg != "--notag")
             llvmConfigFlags.push_back(argv[ai]);
     }
     if (systemLibs || libs) {

@@ -1,6 +1,6 @@
 AUTOMAKE_OPTIONS=foreign
 
-lib_LIBRARIES=libjittefex.a libjittefex-nogc.a
+lib_LIBRARIES=libjittefex.a libjittefex-nogc.a libjittefex-notag.a
 bin_PROGRAMS=jittefex-config
 
 LIBJITTEFEX_SRCS=\
@@ -8,6 +8,9 @@ LIBJITTEFEX_SRCS=\
 
 libjittefex_a_SOURCES=$(LIBJITTEFEX_SRCS) ggggc.cc
 libjittefex_a_CXXFLAGS=@LLVM_CXXFLAGS@ -I$(srcdir)/jittefex/config-gc -I$(srcdir)/ggggc
+
+libjittefex_notag_a_SOURCES=$(LIBJITTEFEX_SRCS) ggggc.cc
+libjittefex_notag_a_CXXFLAGS=@LLVM_CXXFLAGS@ -I$(srcdir)/jittefex/config-notag -I$(srcdir)/ggggc
 
 libjittefex_nogc_a_SOURCES=$(LIBJITTEFEX_SRCS)
 libjittefex_nogc_a_CXXFLAGS=@LLVM_CXXFLAGS@ -I$(srcdir)/jittefex/config-nogc
