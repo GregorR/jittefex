@@ -3813,7 +3813,7 @@ if test x"$with_llvm" != "xno"; then :
 fi
 
 
-ac_config_files="$ac_config_files Makefile src/Makefile examples/Makefile src/jittefex/config.h"
+ac_config_files="$ac_config_files Makefile src/Makefile examples/Makefile src/jittefex/config-prime.h"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -4541,7 +4541,7 @@ do
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
     "src/Makefile") CONFIG_FILES="$CONFIG_FILES src/Makefile" ;;
     "examples/Makefile") CONFIG_FILES="$CONFIG_FILES examples/Makefile" ;;
-    "src/jittefex/config.h") CONFIG_FILES="$CONFIG_FILES src/jittefex/config.h" ;;
+    "src/jittefex/config-prime.h") CONFIG_FILES="$CONFIG_FILES src/jittefex/config-prime.h" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

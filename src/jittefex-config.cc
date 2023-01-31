@@ -24,6 +24,7 @@ void usage() {
         "Options:" << std::endl <<
         "  --version\tPrint Jittefex version." << std::endl <<
         "  --prefix\tPrint the installation prefix." << std::endl <<
+        "  --nogc\tUse a version of Jittefex with no GC support." << std::endl <<
         "  --cflags\tC compiler flags." << std::endl <<
         "  --cxxflags\tC++ compiler flags." << std::endl <<
         "  --ldflags\tLinker flags." << std::endl <<
@@ -34,6 +35,7 @@ void usage() {
 int main(int argc, char **argv) {
     bool version = false,
          prefix = false,
+         nogc = false,
          cflags = false,
          cxxflags = false,
          ldflags = false,
@@ -46,6 +48,8 @@ int main(int argc, char **argv) {
             version = true;
         else if (arg == "--prefix")
             prefix = true;
+        else if (arg == "--nogc")
+            nogc = true;
         else if (arg == "--cflags")
             cflags = true;
         else if (arg == "--cxxflags")
@@ -67,12 +71,20 @@ int main(int argc, char **argv) {
         std::cout << JITTEFEX_VERSION << std::endl;
     if (prefix)
         std::cout << JITTEFEX_PREFIX << std::endl;
-    if (cflags || cxxflags)
-        std::cout << "-I" << JITTEFEX_PREFIX << "/include" << std::endl;
+    if (cflags || cxxflags) {
+        std::cout << "-I" << JITTEFEX_PREFIX << "/include/jittefex/config-";
+        if (nogc)
+            std::cout << "no";
+        std::cout << "gc -I" << JITTEFEX_PREFIX << "/include" << std::endl;
+    }
     if (ldflags)
         std::cout << "-L" << JITTEFEX_PREFIX << "/lib" << std::endl;
-    if (libs)
-        std::cout << "-ljittefex" << std::endl;
+    if (libs) {
+        std::cout << "-ljittefex";
+        if (nogc)
+            std::cout << "-nogc";
+        std::cout << std::endl;
+    }
 
     if (!cflags && !cxxflags && !ldflags && !systemLibs && !libs)
         return 0;

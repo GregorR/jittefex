@@ -119,5 +119,5 @@ AS_IF([test x"$with_llvm" != "xno"], [
 ])
 AC_SUBST([JITTEFEX_LLVM_CONFIG])
 
-AC_CONFIG_FILES([Makefile src/Makefile examples/Makefile src/jittefex/config.h])
+AC_CONFIG_FILES([Makefile src/Makefile examples/Makefile src/jittefex/config-prime.h])
 AC_OUTPUT

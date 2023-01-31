@@ -1,19 +1,27 @@
 AUTOMAKE_OPTIONS=foreign
 
-lib_LIBRARIES=libjittefex.a
+lib_LIBRARIES=libjittefex.a libjittefex-nogc.a
 bin_PROGRAMS=jittefex-config
 
-libjittefex_a_SOURCES=\
-	builder.cc compile.cc ggggc.cc ir.cc jit.cc sfjitLir.cc type.cc
-libjittefex_a_CXXFLAGS=@LLVM_CXXFLAGS@ -I$(srcdir)/ggggc
+LIBJITTEFEX_SRCS=\
+	builder.cc compile.cc ir.cc jit.cc sfjitLir.cc type.cc
+
+libjittefex_a_SOURCES=$(LIBJITTEFEX_SRCS) ggggc.cc
+libjittefex_a_CXXFLAGS=@LLVM_CXXFLAGS@ -I$(srcdir)/jittefex/config-gc -I$(srcdir)/ggggc
+
+libjittefex_nogc_a_SOURCES=$(LIBJITTEFEX_SRCS)
+libjittefex_nogc_a_CXXFLAGS=@LLVM_CXXFLAGS@ -I$(srcdir)/jittefex/config-nogc
 
 jittefex_config_SOURCES=jittefex-config.cc
+jittefex_config_CXXFLAGS=-I$(srcdir)/jittefex/config-gc
 
 nobase_include_HEADERS=\
 	jittefex/builder.h jittefex/compile.h jittefex/gc.h \
 	jittefex/Instruction.def jittefex/instruction.h jittefex/ir.h \
 	jittefex/jit.h jittefex/type.h \
-	jittefex/config.h \
+	jittefex/config-gc/jittefex/config.h \
+	jittefex/config-nogc/jittefex/config.h \
+	jittefex/config-prime.h \
 	jittefex/ggggc/gc-gembc.h jittefex/ggggc/gc.h \
 	jittefex/ggggc/gc-portablems.h jittefex/ggggc/gen-barriers.h \
 	jittefex/ggggc/push.h jittefex/ggggc/thread-locals.h \

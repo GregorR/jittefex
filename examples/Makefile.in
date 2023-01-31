@@ -104,7 +104,7 @@ PROGRAMS = $(bin_PROGRAMS)
 am_jittefex_kaleidoscope_OBJECTS =  \
 	jittefex_kaleidoscope-toy.$(OBJEXT)
 jittefex_kaleidoscope_OBJECTS = $(am_jittefex_kaleidoscope_OBJECTS)
-jittefex_kaleidoscope_DEPENDENCIES = ../src/libjittefex.a
+jittefex_kaleidoscope_DEPENDENCIES = ../src/libjittefex-nogc.a
 jittefex_kaleidoscope_LINK = $(CXXLD) \
 	$(jittefex_kaleidoscope_CXXFLAGS) $(CXXFLAGS) \
 	$(jittefex_kaleidoscope_LDFLAGS) $(LDFLAGS) -o $@
@@ -112,7 +112,7 @@ am_jittefex_kaleidoscope_int_OBJECTS =  \
 	jittefex_kaleidoscope_int-toy-int.$(OBJEXT)
 jittefex_kaleidoscope_int_OBJECTS =  \
 	$(am_jittefex_kaleidoscope_int_OBJECTS)
-jittefex_kaleidoscope_int_DEPENDENCIES = ../src/libjittefex.a
+jittefex_kaleidoscope_int_DEPENDENCIES = ../src/libjittefex-nogc.a
 jittefex_kaleidoscope_int_LINK = $(CXXLD) \
 	$(jittefex_kaleidoscope_int_CXXFLAGS) $(CXXFLAGS) \
 	$(jittefex_kaleidoscope_int_LDFLAGS) $(LDFLAGS) -o $@
@@ -281,13 +281,17 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AUTOMAKE_OPTIONS = foreign
 jittefex_kaleidoscope_SOURCES = toy.cc
-jittefex_kaleidoscope_CXXFLAGS = @LLVM_CXXFLAGS@ -std=c++17 -I${srcdir}/../src -I../src
+jittefex_kaleidoscope_CXXFLAGS = @LLVM_CXXFLAGS@ \
+	-I$(srcdir)/../src -I../src -I$(srcdir)/../src/jittefex/config-nogc
+
 jittefex_kaleidoscope_LDFLAGS = @LLVM_LDFLAGS@
-jittefex_kaleidoscope_LDADD = ../src/libjittefex.a @LLVM_LIBS@
+jittefex_kaleidoscope_LDADD = ../src/libjittefex-nogc.a @LLVM_LIBS@
 jittefex_kaleidoscope_int_SOURCES = toy-int.cc
-jittefex_kaleidoscope_int_CXXFLAGS = @LLVM_CXXFLAGS@ -std=c++17 -I${srcdir}/../src -I../src
+jittefex_kaleidoscope_int_CXXFLAGS = @LLVM_CXXFLAGS@ \
+	-I$(srcdir)/../src -I../src -I$(srcdir)/../src/jittefex/config-nogc
+
 jittefex_kaleidoscope_int_LDFLAGS = @LLVM_LDFLAGS@
-jittefex_kaleidoscope_int_LDADD = ../src/libjittefex.a @LLVM_LIBS@
+jittefex_kaleidoscope_int_LDADD = ../src/libjittefex-nogc.a @LLVM_LIBS@
 all: all-am
 
 .SUFFIXES:
