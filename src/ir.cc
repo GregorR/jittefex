@@ -42,23 +42,23 @@ Instruction *BasicBlock::append(std::unique_ptr<Instruction> instr) {
 bool Function::sljitAllocateRegister(bool flt, SLJITLocation &loc) {
     // Look for any free register
     if (flt) {
-	for (int i = 0; i < sljitFRegs.size(); i++) {
-	    if (!sljitFRegs[i]) {
-		sljitFRegs[i] = true;
-		loc.reg = SLJIT_FS(i);
-		loc.off = 0;
-		return true;
-	    }
-	}
+        for (int i = 0; i < sljitFRegs.size(); i++) {
+            if (!sljitFRegs[i]) {
+                sljitFRegs[i] = true;
+                loc.reg = SLJIT_FS(i);
+                loc.off = 0;
+                return true;
+            }
+        }
     } else {
-	for (int i = 0; i < sljitRegs.size(); i++) {
-	    if (!sljitRegs[i]) {
-		sljitRegs[i] = true;
-		loc.reg = SLJIT_S(i);
-		loc.off = 0;
-		return true;
-	    }
-	}
+        for (int i = 0; i < sljitRegs.size(); i++) {
+            if (!sljitRegs[i]) {
+                sljitRegs[i] = true;
+                loc.reg = SLJIT_S(i);
+                loc.off = 0;
+                return true;
+            }
+        }
     }
 
     return sljitAllocateStack(loc);
@@ -67,12 +67,12 @@ bool Function::sljitAllocateRegister(bool flt, SLJITLocation &loc) {
 bool Function::sljitAllocateStack(SLJITLocation &loc) {
     // Look for stack space
     for (int i = 0; i < sljitStack.size(); i++) {
-	if (!sljitStack[i]) {
-	    sljitStack[i] = true;
-	    loc.reg = SLJIT_MEM1(SLJIT_FRAMEP);
-	    loc.off = -sizeof(sljit_f64) - i * sizeof(sljit_f64);
-	    return true;
-	}
+        if (!sljitStack[i]) {
+            sljitStack[i] = true;
+            loc.reg = SLJIT_MEM1(SLJIT_FRAMEP);
+            loc.off = -sizeof(sljit_f64) - i * sizeof(sljit_f64);
+            return true;
+        }
     }
 
     // No free stack, make more space
