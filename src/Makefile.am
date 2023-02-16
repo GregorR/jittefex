@@ -6,10 +6,13 @@ bin_PROGRAMS=jittefex-config
 LIBJITTEFEX_SRCS=\
 	builder.cc compile.cc ir.cc jit.cc sfjitLir.cc type.cc
 
-libjittefex_a_SOURCES=$(LIBJITTEFEX_SRCS) ggggc.cc
+GGGGC_SRCS=\
+	ggggc.cc ggggc-collections.cc
+
+libjittefex_a_SOURCES=$(LIBJITTEFEX_SRCS) $(GGGGC_SRCS)
 libjittefex_a_CXXFLAGS=@LLVM_CXXFLAGS@ -I$(srcdir)/jittefex/config-gc -I$(srcdir)/ggggc
 
-libjittefex_notag_a_SOURCES=$(LIBJITTEFEX_SRCS) ggggc.cc
+libjittefex_notag_a_SOURCES=$(LIBJITTEFEX_SRCS) $(GGGGC_SRCS)
 libjittefex_notag_a_CXXFLAGS=@LLVM_CXXFLAGS@ -I$(srcdir)/jittefex/config-notag -I$(srcdir)/ggggc
 
 libjittefex_nogc_a_SOURCES=$(LIBJITTEFEX_SRCS)
@@ -31,4 +34,6 @@ nobase_include_HEADERS=\
 	jittefex/ggggc/threads.h jittefex/ggggc/threads-macosx.h \
 	jittefex/ggggc/threads-none.h jittefex/ggggc/threads-posix.h \
 	jittefex/ggggc/threads-windows.h \
+	jittefex/ggggc/collections/list.h jittefex/ggggc/collections/map.h \
+	jittefex/ggggc/collections/unit.h \
 	jittefex/tl/optional.hpp
