@@ -120,11 +120,11 @@ static int gettok() {
       } else if (IdentifierStr == "@printd") {
         ExRefVal = (void *) printd;
       } else if (IdentifierStr == "@sin") {
-        ExRefVal = (void *) sin;
+        ExRefVal = (void *) (double(*)(double)) sin;
       } else if (IdentifierStr == "@cos") {
-        ExRefVal = (void *) cos;
+        ExRefVal = (void *) (double(*)(double)) cos;
       } else if (IdentifierStr == "@atan2") {
-        ExRefVal = (void *) atan2;
+        ExRefVal = (void *) (double(*)(double, double)) atan2;
       } else {
         std::cerr << "Unrecognized extern " << IdentifierStr << std::endl;
         exit(1);
