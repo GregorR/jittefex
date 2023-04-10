@@ -37,6 +37,15 @@ class IRBuilder {
             (void) mod;
         }
 
+        inline IRBuilder(Module *mod, Function *func)
+        {
+            (void) mod;
+
+            // Create an entry point
+            BasicBlock *bb = BasicBlock::create("entry", func);
+            insertionPoint = bb;
+        }
+
         inline BasicBlock * const getInsertBlock() { return insertionPoint; }
         void setInsertPoint(BasicBlock *to);
 
