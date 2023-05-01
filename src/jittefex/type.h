@@ -169,7 +169,11 @@ class Type {
 
 #ifdef JITTEFEX_HAVE_SFJIT
 	// Convert to an sljit type, if possible
-	int getSLJITType() const;
+	int getSLJITType(
+#ifdef JITTEFEX_ENABLE_GC
+        bool includeGC = false
+#endif
+    ) const;
 #endif
 
         inline const BaseType getBaseType() const { return baseType; }

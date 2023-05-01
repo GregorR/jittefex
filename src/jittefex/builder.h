@@ -31,10 +31,11 @@ class IRBuilder {
 
     public:
         inline IRBuilder(Module *mod, BasicBlock *insertionPoint = nullptr)
-            : insertionPoint{insertionPoint}
         {
             // The module is only here for familiarity with LLVM
             (void) mod;
+            if (insertionPoint)
+                setInsertPoint(insertionPoint);
         }
 
         inline IRBuilder(Module *mod, Function *func)
@@ -42,8 +43,7 @@ class IRBuilder {
             (void) mod;
 
             // Create an entry point
-            BasicBlock *bb = BasicBlock::create("entry", func);
-            insertionPoint = bb;
+            setInsertPoint(BasicBlock::create("entry", func));
         }
 
         inline BasicBlock * const getInsertBlock() { return insertionPoint; }
@@ -113,6 +113,24 @@ class IRBuilder {
         Instruction *createStore(
             Instruction *val, Instruction *ptr, bool isVolatile = false
         );
+
+#ifdef JITTEFEX_ENABLE_GC
+        Instruction *createGCLoad(
+            const Type &ty, Instruction *ptr, int64_t offset = 0,
+            bool isVolatile = false, const std::string &name = ""
+        );
+
+        Instruction *createGCStore(
+            Instruction *val, Instruction *ptr, int64_t offset = 0,
+            bool isVolatile = false
+        );
+
+#ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
+        Instruction *createGCTag(
+            Instruction *val, Instruction *tag
+        );
+#endif
+#endif
 
         Instruction *createTrunc(
             Instruction *v, const Type &destTy, const std::string &name = ""

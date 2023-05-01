@@ -49,7 +49,11 @@ llvm::Type *Type::getLLVMType(llvm::LLVMContext &context) const {
 #endif
 
 #ifdef JITTEFEX_HAVE_SFJIT
-int Type::getSLJITType() const {
+int Type::getSLJITType(
+#ifdef JITTEFEX_ENABLE_GC
+    bool includeGC
+#endif
+) const {
     switch (baseType) {
         case BaseType::Signed:
         case BaseType::Unsigned:
@@ -78,6 +82,15 @@ int Type::getSLJITType() const {
         case BaseType::Pointer:
         case BaseType::CodePointer:
             return SLJIT_ARG_TYPE_P;
+
+#ifdef JITTEFEX_ENABLE_GC
+        case BaseType::GCPointer:
+        case BaseType::TaggedWord:
+            if (includeGC)
+                return SLJIT_ARG_TYPE_W;
+            else
+                return -1;
+#endif
 
         /* GCPointer and TaggedWord are intentionally included here, because
          * they must be converted to be safely used */

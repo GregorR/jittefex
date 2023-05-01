@@ -103,7 +103,15 @@ bool Function::sljitAllocateGCStack(SLJITLocation &loc) {
     // Stack goes (tag word) (one word per sizeof word) (tag word) ...
     {
         sljit_sw sub = off % sizeof(sljit_sw);
-        off = off / sizeof(sljit_sw) * (sizeof(sljit_sw) + 1) + sub + 1;
+
+        // Offset in words...
+        off /= sizeof(sljit_sw);
+
+        // Tag base location is the tag word + the sub offset
+        loc.tag = off * (sizeof(sljit_sw) + 1) * sizeof(sljit_sw) + sub;
+
+        // Offset is adjusted to skip the tag word
+        off = off * (sizeof(sljit_sw) + 1) + sub + 1;
     }
 #endif
     off *= sizeof(sljit_sw);

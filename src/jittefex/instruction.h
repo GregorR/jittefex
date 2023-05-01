@@ -41,6 +41,10 @@ typedef Instruction Value;
 struct SLJITLocation {
     int32_t reg = -1;
     ptrdiff_t off = -1;
+#ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
+    /* For stack locations only, the location of the tag */
+    ptrdiff_t tag = -1;
+#endif
 };
 #endif
 
@@ -282,6 +286,77 @@ class StoreInst : public Instruction {
         J_GETTERS(Instruction *, Val, val)
         J_GETTERS(Instruction *, Ptr, ptr)
 };
+
+#ifdef JITTEFEX_ENABLE_GC
+/**
+ * GC load instruction.
+ */
+class GCLoadInst : public Instruction {
+    private:
+        Instruction *ptr;
+        int64_t offset;
+
+    public:
+        inline GCLoadInst(
+            BasicBlock *parent, const Type &type, Instruction *ptr,
+            int64_t offset J_NAME_P
+        )
+            : Instruction(parent, Opcode::Load, type J_NAME_A)
+            , ptr{ptr}
+            , offset{offset}
+            {}
+
+        J_GETTERS(Instruction *, Ptr, ptr)
+        J_GETTERS(int64_t, Offset, offset)
+};
+
+/**
+ * GC store instruction.
+ */
+class GCStoreInst : public Instruction {
+    private:
+        Instruction *val;
+        Instruction *ptr;
+        int64_t offset;
+
+    public:
+        inline GCStoreInst(
+            BasicBlock *parent, Instruction *val, Instruction *ptr,
+            int64_t offset J_NAME_P
+        )
+            : Instruction(parent, Opcode::Store, Type::voidType() J_NAME_A)
+            , val{val}
+            , ptr{ptr}
+            {}
+
+        J_GETTERS(Instruction *, Val, val)
+        J_GETTERS(Instruction *, Ptr, ptr)
+        J_GETTERS(int64_t, Offset, offset)
+};
+
+#ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
+/**
+ * GC tag instruction (tag this value).
+ */
+class GCTagInst : public Instruction {
+    private:
+        Instruction *val;
+        Instruction *tag;
+
+    public:
+        inline GCTagInst(
+            BasicBlock *parent, Instruction *val, Instruction *tag J_NAME_P
+        )
+            : Instruction(parent, Opcode::Store, Type::voidType() J_NAME_A)
+            , val{val}
+            , tag{tag}
+            {}
+
+        J_GETTERS(Instruction *, Val, val)
+        J_GETTERS(Instruction *, Tag, tag)
+};
+#endif
+#endif
 
 /**
  * Typecasts of all forms.

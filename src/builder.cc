@@ -61,7 +61,15 @@ void IRBuilder::setInsertPoint(BasicBlock *to)
 #endif
 
             // Create the basic entry
-            stype = f->getFunctionType()->getReturnType().getSLJITType();
+            Type returnType = f->getFunctionType()->getReturnType();
+            if (returnType.getBaseType() == BaseType::GCPointer ||
+                returnType.getBaseType() == BaseType::TaggedWord) {
+                // FIXME: Handled specially
+                stype = SLJIT_ARG_TYPE_W;
+            } else {
+                stype = returnType.getSLJITType();
+            }
+
             if (stype < 0) {
                 // Not compilable with SLJIT!
                 f->cancelSLJIT();
@@ -192,6 +200,12 @@ void IRBuilder::setInsertPoint(BasicBlock *to)
                         f->cancelSLJIT();
                 }
                 f->sljitRegs[0] = true;
+            }
+
+            // Get the GC stack pointer into R1 for later use
+            if (f->sljitCompiler) {
+                if (sljit_emit_op1(sc, SLJIT_MOV, SLJIT_R1, 0, SLJIT_GCSP, 0))
+                    f->cancelSLJIT();
             }
 
             // Alloca on the GC stack
@@ -722,7 +736,7 @@ Instruction *IRBuilder::createStore(
                 SCANCEL();
         }
 
-        if (ptr->getOpcode() == Opcode::Alloca) {
+        if (ptr->getType().getBaseType() == BaseType::GCStack) {
             /* The location is the actual allocated location, rather than a
              * pointer */
             if (flt) {
@@ -759,6 +773,265 @@ Instruction *IRBuilder::createStore(
 
     return ret;
 }
+
+#ifdef JITTEFEX_ENABLE_GC
+Instruction *IRBuilder::createGCLoad(
+    const Type &ty, Instruction *ptr, int64_t offset, bool isVolatile,
+    const std::string &name
+) {
+    // FIXME
+    (void) isVolatile;
+    (void) name;
+
+#ifdef JITTEFEX_ENABLE_DEBUG
+    const Type &pType = ptr->getType();
+    assert(pType.getBaseType() == BaseType::GCPointer ||
+           pType.getBaseType() == BaseType::TaggedWord ||
+           pType.getBaseType() == BaseType::GCStack);
+    if (pType.getBaseType() == BaseType::GCStack)
+        assert(offset == 0);
+#endif
+
+    Instruction *ret =
+        insertionPoint->append(std::make_unique<GCLoadInst>(
+            insertionPoint, ty, ptr, offset NAME));
+
+#ifdef JITTEFEX_USE_SFJIT
+    SJ {
+        int stype = ty.getSLJITType(true);
+        bool flt = false;
+        sljit_s32 op;
+
+        switch (stype) {
+            case SLJIT_ARG_TYPE_W:
+                op = SLJIT_MOV;
+                break;
+
+            case SLJIT_ARG_TYPE_32:
+                op = SLJIT_MOV32;
+                break;
+
+            case SLJIT_ARG_TYPE_P:
+                op = SLJIT_MOV_P;
+                break;
+
+            case SLJIT_ARG_TYPE_F64:
+                op = SLJIT_MOV_F64;
+                flt = true;
+                break;
+
+            case SLJIT_ARG_TYPE_F32:
+                op = SLJIT_MOV_F32;
+                flt = true;
+                break;
+
+            default:
+                SCANCEL();
+        }
+
+#ifdef JITTEFEX_ENABLE_GC_STACK
+        if (ty.getBaseType() == BaseType::GCPointer ||
+            ty.getBaseType() == BaseType::TaggedWord) {
+            // Needs to go on the GC stack
+            if (!f->sljitAllocateGCStack(ret->sljitLoc))
+                SCANCEL();
+        } else
+#endif
+        if (!f->sljitAllocateRegister(flt, ret->sljitLoc))
+            SCANCEL();
+
+        if (ptr->getType().getBaseType() == BaseType::GCStack) {
+            /* The location is the actual allocated location, rather than a
+             * pointer */
+            if (flt) {
+                if (sljit_emit_fop1(sc, op, ret->sljitLoc.reg, ret->sljitLoc.off,
+                    ptr->sljitLoc.reg, ptr->sljitLoc.off)) {
+                    SCANCEL();
+                }
+            } else {
+                if (sljit_emit_op1(sc, op, ret->sljitLoc.reg, ret->sljitLoc.off,
+                    ptr->sljitLoc.reg, ptr->sljitLoc.off)) {
+                    SCANCEL();
+                }
+            }
+#ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
+            if (ty.getBaseType() == BaseType::GCPointer ||
+                ty.getBaseType() == BaseType::TaggedWord) {
+                if (sljit_emit_op1(sc, SLJIT_MOV_U8, ret->sljitLoc.reg,
+                    ret->sljitLoc.tag, ptr->sljitLoc.reg, ptr->sljitLoc.tag)) {
+                    SCANCEL();
+                }
+            }
+#endif
+
+        } else {
+            /* The location is an actual pointer */
+            sljit_emit_op1(sc, op, SLJIT_R0, 0, ptr->sljitLoc.reg, ptr->sljitLoc.off);
+            if (flt) {
+                if (sljit_emit_fop1(sc, op, ret->sljitLoc.reg, ret->sljitLoc.off,
+                    SLJIT_MEM1(SLJIT_R0), offset)) {
+                    SCANCEL();
+                }
+            } else {
+                if (sljit_emit_op1(sc, op, ret->sljitLoc.reg, ret->sljitLoc.off,
+                    SLJIT_MEM1(SLJIT_R0), offset)) {
+                    SCANCEL();
+                }
+            }
+
+#ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
+            /* Don't get a tag just from this */
+            if (ty.getBaseType() == BaseType::GCPointer) {
+                if (sljit_emit_op1(sc, SLJIT_MOV_U8, ret->sljitLoc.reg,
+                    ret->sljitLoc.tag, SLJIT_IMM, 0)) {
+                    SCANCEL();
+                }
+            } else if (ty.getBaseType() == BaseType::TaggedWord) {
+                if (sljit_emit_op1(sc, SLJIT_MOV_U8, ret->sljitLoc.reg,
+                    ret->sljitLoc.tag, SLJIT_IMM, 1)) {
+                    SCANCEL();
+                }
+            }
+#endif
+        }
+
+    }
+#endif
+
+    return ret;
+}
+
+
+Instruction *IRBuilder::createGCStore(
+    Instruction *val, Instruction *ptr, int64_t offset, bool isVolatile
+) {
+    // FIXME
+    (void) isVolatile;
+
+#ifdef JITTEFEX_ENABLE_DEBUG
+    const Type &pType = ptr->getType();
+    assert(pType.getBaseType() == BaseType::GCPointer ||
+           pType.getBaseType() == BaseType::TaggedWord ||
+           pType.getBaseType() == BaseType::GCStack);
+    if (pType.getBaseType() == BaseType::GCStack)
+        assert(offset == 0);
+#endif
+
+    Instruction *ret = insertionPoint->append(
+        std::make_unique<GCStoreInst>(insertionPoint, val, ptr, offset));
+
+#ifdef JITTEFEX_USE_SFJIT
+    SJ {
+        int stype = val->getType().getSLJITType(true);
+        bool flt = false;
+        sljit_s32 op;
+
+        switch (stype) {
+            case SLJIT_ARG_TYPE_W:
+                op = SLJIT_MOV;
+                break;
+
+            case SLJIT_ARG_TYPE_32:
+                op = SLJIT_MOV32;
+                break;
+
+            case SLJIT_ARG_TYPE_P:
+                op = SLJIT_MOV_P;
+                break;
+
+            case SLJIT_ARG_TYPE_F64:
+                op = SLJIT_MOV_F64;
+                flt = true;
+                break;
+
+            case SLJIT_ARG_TYPE_F32:
+                op = SLJIT_MOV_F32;
+                flt = true;
+                break;
+
+            default:
+                SCANCEL();
+        }
+
+        if (ptr->getType().getBaseType() == BaseType::GCStack) {
+            /* The location is the actual allocated location, rather than a
+             * pointer */
+            if (flt) {
+                if (sljit_emit_fop1(sc, op,
+                    ptr->sljitLoc.reg, ptr->sljitLoc.off,
+                    val->sljitLoc.reg, val->sljitLoc.off)) {
+                    SCANCEL();
+                }
+            } else {
+                if (sljit_emit_op1(sc, op,
+                    ptr->sljitLoc.reg, ptr->sljitLoc.off,
+                    val->sljitLoc.reg, val->sljitLoc.off)) {
+                    SCANCEL();
+                }
+            }
+
+#ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
+            if (val->getType().getBaseType() == BaseType::GCPointer ||
+                val->getType().getBaseType() == BaseType::TaggedWord) {
+                // Both are on the stack, so move the tag too
+                if (sljit_emit_op1(sc, SLJIT_MOV_U8,
+                    ptr->sljitLoc.reg, ptr->sljitLoc.tag,
+                    val->sljitLoc.reg, val->sljitLoc.tag)) {
+                    SCANCEL();
+                }
+            }
+#endif
+
+        } else {
+            /* The location is an actual pointer */
+            sljit_emit_op1(sc, op, SLJIT_R0, 0, ptr->sljitLoc.reg, ptr->sljitLoc.off);
+            if (flt) {
+                if (sljit_emit_fop1(sc, op, SLJIT_MEM1(SLJIT_R0), 0,
+                    val->sljitLoc.reg, val->sljitLoc.off)) {
+                    SCANCEL();
+                }
+            } else {
+                if (sljit_emit_op1(sc, op, SLJIT_MEM1(SLJIT_R0), 0,
+                    val->sljitLoc.reg, val->sljitLoc.off)) {
+                    SCANCEL();
+                }
+            }
+        }
+
+    }
+#endif
+
+    return ret;
+}
+
+#ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
+Instruction *IRBuilder::createGCTag(
+    Instruction *val, Instruction *tag
+) {
+#ifdef JITTEFEX_ENABLE_DEBUG
+    const Type &pType = val->getType();
+    assert(pType.getBaseType() == BaseType::GCPointer ||
+           pType.getBaseType() == BaseType::TaggedWord ||
+           pType.getBaseType() == BaseType::GCStack);
+#endif
+
+    Instruction *ret = insertionPoint->append(
+        std::make_unique<GCTagInst>(insertionPoint, val, tag));
+
+#ifdef JITTEFEX_USE_SFJIT
+    SJ {
+        if (sljit_emit_op1(sc, SLJIT_MOV_U8,
+            val->sljitLoc.reg, val->sljitLoc.tag,
+            tag->sljitLoc.reg, tag->sljitLoc.off)) {
+            SCANCEL();
+        }
+    }
+#endif
+
+    return ret;
+}
+#endif
+#endif
 
 // 2017
 Instruction *IRBuilder::createTrunc(
