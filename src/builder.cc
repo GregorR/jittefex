@@ -1573,6 +1573,17 @@ Instruction *IRBuilder::createIntLiteral(const Type &ty, long long val) {
 
 #ifdef JITTEFEX_USE_SFJIT
     SJ {
+#ifdef JITTEFEX_ENABLE_GC_STACK
+        if (ty.getBaseType() == BaseType::GCPointer ||
+            ty.getBaseType() == BaseType::TaggedWord) {
+            if (!f->sljitAllocateGCStack(ret->sljitLoc))
+                SCANCEL();
+            if (sljit_emit_op1(sc, SLJIT_MOV,
+                ret->sljitLoc.reg, ret->sljitLoc.off,
+                SLJIT_IMM, (sljit_sw) val))
+                SCANCEL();
+        } else
+#endif
         ret->sljitLoc = SLJITLocation{SLJIT_IMM, (ptrdiff_t) val};
     }
 #endif
