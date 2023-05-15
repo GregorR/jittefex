@@ -19,6 +19,7 @@
 #if !(defined SLJIT_CONFIG_UNSUPPORTED && SLJIT_CONFIG_UNSUPPORTED)
 #define JITTEFEX_USE_SFJIT 1
 #define SLJIT_GCSP SLJIT_S0
+#define SLJIT_GCFP SLJIT_S1
 #endif
 #endif
 
@@ -105,11 +106,9 @@ void IRBuilder::setInsertPoint(BasicBlock *to)
 #ifdef JITTEFEX_ENABLE_GC_STACK
                     if (type.getBaseType() == BaseType::GCPointer ||
                         type.getBaseType() == BaseType::TaggedWord) {
-                        /* In the GC stack. When we transfer these to our own
-                         * stack frame, SLJIT_R1 will be a reference back to the
-                         * original arg frame, so we use R1 here. */
+                        /* In the GC stack */
                         f->sljitArgLocs.push_back(
-                            SLJITLocation{SLJIT_MEM1(SLJIT_R1), gcOff});
+                            SLJITLocation{SLJIT_MEM1(SLJIT_GCFP), gcOff});
                         gcCt++;
                         gcOff += sizeof(sljit_sw);
 #ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
@@ -199,13 +198,14 @@ void IRBuilder::setInsertPoint(BasicBlock *to)
                                 gcStackLoc.reg, gcStackLoc.off))
                         f->cancelSLJIT();
                 }
-                f->sljitRegs[0] = true;
+                f->sljitRegs[0 /* SP */] = true;
             }
 
-            // Get the GC stack pointer into R1 for later use
+            // Get the GC stack pointer as a frame pointer
             if (f->sljitCompiler) {
-                if (sljit_emit_op1(sc, SLJIT_MOV, SLJIT_R1, 0, SLJIT_GCSP, 0))
+                if (sljit_emit_op1(sc, SLJIT_MOV, SLJIT_GCFP, 0, SLJIT_GCSP, 0))
                     f->cancelSLJIT();
+                f->sljitRegs[1 /* FP */] = true;
             }
 
             // Alloca on the GC stack
@@ -218,56 +218,6 @@ void IRBuilder::setInsertPoint(BasicBlock *to)
                 f->sljitGCAllocaIn = (void *) sljit_emit_label(sc);
                 if (!f->sljitGCAllocaIn)
                     f->cancelSLJIT();
-            }
-
-            // And get our GC args in place
-            if (f->sljitCompiler) {
-                argIdx = 0;
-                for (auto &type : f->getFunctionType()->getParamTypes()) {
-                    if (type.getBaseType() != BaseType::GCPointer &&
-                        type.getBaseType() != BaseType::TaggedWord) {
-                        // Already handled
-                        argIdx++;
-                        continue;
-                    }
-
-                    auto &loc = f->sljitArgLocs[argIdx++];
-                    assert(loc.reg == SLJIT_MEM1(SLJIT_R1));
-
-                    // Get a new GC stack location
-                    SLJITLocation newLoc;
-                    if (!f->sljitAllocateGCStack(newLoc)) {
-                        f->cancelSLJIT();
-                        break;
-                    }
-
-                    // Move it there
-                    if (sljit_emit_op1(sc, SLJIT_MOV,
-                        newLoc.reg, newLoc.off, loc.reg, loc.off)) {
-                        f->cancelSLJIT();
-                        break;
-                    }
-
-#ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
-                    // And move the tag
-                    const sljit_sw blockSize =
-                        sizeof(sljit_sw) * (sizeof(sljit_sw) + 1);
-                    sljit_sw sub = loc.off % blockSize / sizeof(sljit_sw) - 1;
-                    sljit_sw tOff = loc.off / blockSize * blockSize + sub;
-                    sljit_sw nSub = newLoc.off % blockSize / sizeof(sljit_sw) - 1;
-                    sljit_sw nTOff = newLoc.off / blockSize * blockSize + nSub;
-                    if (sljit_emit_op1(sc, SLJIT_MOV_U8, SLJIT_R0, 0,
-                        loc.reg, tOff)) {
-                        f->cancelSLJIT();
-                        break;
-                    }
-                    if (sljit_emit_op1(sc, SLJIT_MOV_U8, newLoc.reg, nTOff,
-                        SLJIT_R0, 0)) {
-                        f->cancelSLJIT();
-                        break;
-                    }
-#endif
-                }
             }
 #endif
 
@@ -572,6 +522,10 @@ Instruction *IRBuilder::createAlloca(
     (void) name;
     Instruction *ret = insertionPoint->append(
         std::make_unique<AllocaInst>(insertionPoint, ty, arraySize NAME));
+#ifdef JITTEFEX_ENABLE_GC_STACK
+    assert(ty.getBaseType() != BaseType::GCPointer &&
+           ty.getBaseType() != BaseType::TaggedWord);
+#endif
 
 #ifdef JITTEFEX_USE_SFJIT
     SJ {
@@ -775,6 +729,37 @@ Instruction *IRBuilder::createStore(
 }
 
 #ifdef JITTEFEX_ENABLE_GC
+#ifdef JITTEFEX_ENABLE_GC_STACK
+Instruction *IRBuilder::createGCAlloca(
+    const Type &ty, Instruction *arraySize,
+    const std::string &name
+) {
+    (void) name;
+    Instruction *ret = insertionPoint->append(
+        std::make_unique<GCAllocaInst>(insertionPoint, ty, arraySize NAME));
+    assert(ty.getBaseType() == BaseType::GCPointer ||
+           ty.getBaseType() == BaseType::TaggedWord);
+
+#ifdef JITTEFEX_USE_SFJIT
+    SJ {
+        sljit_sw offset;
+
+        if (arraySize) {
+            // Not supported
+            SCANCEL();
+        }
+
+        // Convert it to an sljit type
+        // Make space for it
+        if (!f->sljitAllocateGCStack(ret->sljitLoc))
+            SCANCEL();
+    }
+#endif
+
+    return ret;
+}
+#endif
+
 Instruction *IRBuilder::createGCLoad(
     const Type &ty, Instruction *ptr, int64_t offset, bool isVolatile,
     const std::string &name

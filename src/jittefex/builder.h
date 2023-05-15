@@ -115,6 +115,13 @@ class IRBuilder {
         );
 
 #ifdef JITTEFEX_ENABLE_GC
+#ifdef JITTEFEX_ENABLE_GC_STACK
+        Instruction *createGCAlloca(
+            const Type &ty, Instruction *arraySize = nullptr,
+            const std::string &name = ""
+        );
+#endif
+
         Instruction *createGCLoad(
             const Type &ty, Instruction *ptr, int64_t offset = 0,
             bool isVolatile = false, const std::string &name = ""

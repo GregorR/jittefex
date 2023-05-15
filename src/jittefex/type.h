@@ -35,9 +35,12 @@ enum BaseType {
      * a different type to enforce this step if you need it. */
     Stack,
 
-    /* Equivalent special type for GCAlloca. In the case of GCAlloca, getting
-     * the actual pointer is simply not allowed. */
+    /* Equivalent special type for arguments on the GC stack. */
     GCStack,
+
+    /* An actual, reified pointer to the GC stack. Distinct from Pointer or
+     * GCPointer because it is to a stack, and has stack-like tagging. */
+    GCStackPointer,
 
     // Non-GC'd pointer
     Pointer,
@@ -103,6 +106,10 @@ class Type {
 
         static inline Type gcStackType() {
             return Type{BaseType::GCStack, 0};
+        }
+
+        static inline Type gcStackPointerType() {
+            return Type{BaseType::GCStackPointer, 0};
         }
 
         static inline Type pointerType() {

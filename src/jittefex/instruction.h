@@ -249,6 +249,29 @@ class AllocaInst : public Instruction {
 };
 
 /**
+ * Local (GC stack) allocation of data.
+ */
+class GCAllocaInst : public Instruction {
+    private:
+        Type allocaType;
+        Instruction *arraySize; // OPTIONAL
+
+    public:
+        inline GCAllocaInst(
+            BasicBlock *parent, const Type &type,
+            Instruction *arraySize = nullptr J_NAME_P
+        )
+            : Instruction(parent, Opcode::GCAlloca, Type::gcStackPointerType()
+                J_NAME_A)
+            , allocaType{type}
+            , arraySize{arraySize}
+            {}
+
+        J_GETTERS(Type, AllocaType, allocaType)
+        J_GETTERS(Instruction *, ArraySize, arraySize)
+};
+
+/**
  * Load instruction.
  */
 class LoadInst : public Instruction {

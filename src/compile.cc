@@ -67,7 +67,10 @@ void *compile(Function *func) {
             if (size) do {
                 // Allocate the space
 #ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
-                size = size + (size + sizeof(sljit_sw) - 1) / sizeof(sljit_sw);
+                // Number of blocks needed
+                size = (size + sizeof(sljit_sw) - 1) / sizeof(sljit_sw);
+                // Resize to blocks
+                size *= sizeof(sljit_sw) + 1;
 #endif
                 size *= sizeof(sljit_sw);
                 struct sljit_label *lbl = sljit_emit_label(sc);

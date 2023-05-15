@@ -275,7 +275,7 @@ HANDLE_META_INST(1100, Arg      , ArgInst       )
 // GC-related instructions
  FIRST_GC_INST(1200)
 HANDLE_GC_INST(1200, GCYield    , Instruction   )
-HANDLE_GC_INST(1201, GCAlloca   , AllocaInst    )
+HANDLE_GC_INST(1201, GCAlloca   , GCAllocaInst  )
 HANDLE_GC_INST(1202, GCLoad     , LoadInst      )
 HANDLE_GC_INST(1203, GCLoadTag  , LoadInst      )
 HANDLE_GC_INST(1204, GCStore    , StoreInst     )
