@@ -23,6 +23,7 @@ namespace jittefex {
 
 class Jittefex;
 class Function;
+struct MachineCode;
 class Module;
 class IRBuilder;
 
@@ -34,7 +35,7 @@ class BasicBlock {
         Function *parent = nullptr;
         friend class Function;
         friend class IRBuilder;
-        friend void *compile(Function *);
+        friend MachineCode *compile(Function *);
 
 #ifdef JITTEFEX_HAVE_SFJIT
         void *sljitLabel = nullptr; // Label for this basic block
@@ -72,11 +73,15 @@ class Function {
     protected:
         Module *parent = nullptr;
         friend class Module;
-        friend void *compile(Function *);
+        friend MachineCode *compile(Function *);
+
+        /**
+         * The compiled version of this code.
+         */
+        MachineCode *machineCode = nullptr;
 
 #ifdef JITTEFEX_HAVE_SFJIT
         void *sljitCompiler = nullptr; // actually struct sljit_compiler *
-        void *sljitCode = nullptr;
         void *sljitAlloca = nullptr; // actually struct sljit_alloca *
         bool sljitInit = false;
 
@@ -127,10 +132,6 @@ class Function {
         friend class IRBuilder;
 #endif
 
-#ifdef JITTEFEX_HAVE_LLVM
-        void *llvmCode = nullptr;
-#endif
-
     private:
         FunctionType *type;
         std::string name;
@@ -166,6 +167,15 @@ class Function {
         BasicBlock *append(std::unique_ptr<BasicBlock> block);
 
         void eraseFromParent();
+};
+
+/**
+ * When a function is compiled into machine code, we reference count that
+ * machine code with a MachineCode. See compile.h.
+ */
+struct MachineCode {
+    int refCount;
+    void *code;
 };
 
 /**

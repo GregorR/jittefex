@@ -47,7 +47,12 @@ llvm::Expected<llvm::Value *> toLLVM(
 unsigned long long llvmNameCtr = 0;
 #endif
 
-void *compile(Function *func) {
+MachineCode *compile(Function *func) {
+    if (func->machineCode) {
+        func->machineCode->refCount++;
+        return func->machineCode;
+    }
+
     // FIXME: This needs to support multiple runmodes
 #ifdef JITTEFEX_USE_SFJIT
     if (func->sljitCompiler) {
@@ -139,21 +144,25 @@ void *compile(Function *func) {
         }
 
         // Then generate code
-        if (sc)
-            func->sljitCode = sljit_generate_code(sc);
+        if (sc) {
+            void *code = sljit_generate_code(sc);
+            if (code) {
+                auto mc = new MachineCode;
+                mc->refCount = 2;
+                mc->code = code;
+                func->machineCode = mc;
+            }
+        }
 
         sljit_free_compiler((struct sljit_compiler *) func->sljitCompiler);
         func->sljitCompiler = nullptr;
-    }
 
-    if (func->sljitCode)
-        return func->sljitCode;
+        if (func->machineCode)
+            return func->machineCode;
+    }
 #endif
 
 #ifdef JITTEFEX_HAVE_LLVM
-    if (func->llvmCode)
-        return func->llvmCode;
-
     std::string name = func->name + std::to_string(llvmNameCtr++);
 
     // Create a module for this function
@@ -234,7 +243,13 @@ void *compile(Function *func) {
     // Get the compiled function
     auto sym = exitOnErr(jit->lookup(name));
 
-    return (func->llvmCode = (void *) sym.getAddress());
+    {
+        auto mc = new MachineCode;
+        mc->refCount = 2;
+        mc->code = (void *) sym.getAddress();
+        func->machineCode = mc;
+        return mc;
+    }
 
 #else
     abort();

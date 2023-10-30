@@ -1297,9 +1297,12 @@ static void HandleTopLevelExpression() {
       // Delete the anonymous expression module from the JIT.
       ExitOnErr(RT->remove());
 #endif
+      jittefex::MachineCode *mc;
       ptrdiff_t (*f)();
-      f = (ptrdiff_t(*)()) jittefex::compile(F);
+      mc = jittefex::compile(F);
+      f = (ptrdiff_t(*)()) mc->code;
       fprintf(stderr, "Evaluated to %d\n", (int) f());
+      mc->refCount--; // FIXME
       //InitializeModule();
       F->eraseFromParent();
     }
