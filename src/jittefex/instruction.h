@@ -359,18 +359,38 @@ class GCStoreInst : public Instruction {
 
 #ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
 /**
- * GC tag instruction (tag this value).
+ * GC load-tag instruction (get the tag of this value).
  */
-class GCTagInst : public Instruction {
+class GCLoadTagInst : public Instruction {
+    private:
+        Instruction *val;
+
+    public:
+        inline GCLoadTagInst(
+            BasicBlock *parent, Instruction *val J_NAME_P
+        )
+            : Instruction(
+                parent, Opcode::GCLoadTag, Type::unsignedWordType() J_NAME_A
+            )
+            , val{val}
+            {}
+
+        J_GETTERS(Instruction *, Val, val)
+};
+
+/**
+ * GC store-tag instruction (tag this value).
+ */
+class GCStoreTagInst : public Instruction {
     private:
         Instruction *val;
         Instruction *tag;
 
     public:
-        inline GCTagInst(
+        inline GCStoreTagInst(
             BasicBlock *parent, Instruction *val, Instruction *tag J_NAME_P
         )
-            : Instruction(parent, Opcode::Store, Type::voidType() J_NAME_A)
+            : Instruction(parent, Opcode::GCStoreTag, Type::voidType() J_NAME_A)
             , val{val}
             , tag{tag}
             {}
@@ -494,6 +514,22 @@ class ArgInst : public Instruction {
     public:
         inline ArgInst(BasicBlock *parent, const Type &type, int idx J_NAME_P)
             : Instruction(parent, Opcode::Arg, type J_NAME_A)
+            , idx{idx}
+            {}
+
+        J_GETTERS(int, Idx, idx)
+};
+
+/**
+ * Indexed GC argument (can be unified with Arg in some cases).
+ */
+class GCArgInst : public Instruction {
+    private:
+        int idx;
+
+    public:
+        inline GCArgInst(BasicBlock *parent, const Type &type, int idx J_NAME_P)
+            : Instruction(parent, Opcode::GCArg, type J_NAME_A)
             , idx{idx}
             {}
 

@@ -730,6 +730,51 @@ Instruction *IRBuilder::createStore(
 
 #ifdef JITTEFEX_ENABLE_GC
 #ifdef JITTEFEX_ENABLE_GC_STACK
+Instruction *IRBuilder::createGCArg(const Type &ty, int idx) {
+    Instruction *ret = insertionPoint->append(
+        std::make_unique<GCArgInst>(insertionPoint, ty, idx));
+    assert(ty.getBaseType() == BaseType::GCPointer ||
+           ty.getBaseType() == BaseType::TaggedWord);
+
+#ifdef JITTEFEX_USE_SFJIT
+    SJ {
+        SLJITLocation argLoc;
+
+        argLoc.reg = SLJIT_MEM1(SLJIT_GCFP);
+
+#ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
+        // Account for tag words
+        sljit_sw blockNo = idx / sizeof(size_t);
+        sljit_sw offsetWithinBlock = idx % sizeof(size_t);
+        argLoc.off =
+            ((blockNo * (sizeof(size_t) + 1)) + offsetWithinBlock + 1) *
+            sizeof(size_t);
+        argLoc.tag =
+            blockNo * (sizeof(size_t) + 1) * sizeof(size_t) +
+            offsetWithinBlock;
+#else
+        argLoc.off = idx * sizeof(size_t);
+#endif
+
+        if (!f->sljitAllocateGCStack(ret->sljitLoc))
+            SCANCEL();
+        if (sljit_emit_op1(sc, SLJIT_MOV,
+            ret->sljitLoc.reg, ret->sljitLoc.off,
+            argLoc.reg, argLoc.off))
+            SCANCEL();
+
+#ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
+        if (sljit_emit_op1(sc, SLJIT_MOV_U8,
+            ret->sljitLoc.reg, ret->sljitLoc.tag,
+            argLoc.reg, argLoc.tag))
+            SCANCEL();
+#endif
+    }
+#endif
+
+    return ret;
+}
+
 Instruction *IRBuilder::createGCAlloca(
     const Type &ty, Instruction *arraySize,
     const std::string &name
@@ -742,8 +787,6 @@ Instruction *IRBuilder::createGCAlloca(
 
 #ifdef JITTEFEX_USE_SFJIT
     SJ {
-        sljit_sw offset;
-
         if (arraySize) {
             // Not supported
             SCANCEL();
@@ -990,9 +1033,7 @@ Instruction *IRBuilder::createGCStore(
 }
 
 #ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
-Instruction *IRBuilder::createGCTag(
-    Instruction *val, Instruction *tag
-) {
+Instruction *IRBuilder::createGCLoadTag(Instruction *val) {
 #ifdef JITTEFEX_ENABLE_DEBUG
     const Type &pType = val->getType();
     assert(pType.getBaseType() == BaseType::GCPointer ||
@@ -1001,7 +1042,38 @@ Instruction *IRBuilder::createGCTag(
 #endif
 
     Instruction *ret = insertionPoint->append(
-        std::make_unique<GCTagInst>(insertionPoint, val, tag));
+        std::make_unique<GCLoadTagInst>(insertionPoint, val));
+
+#ifdef JITTEFEX_USE_SFJIT
+    SJ {
+        if (!f->sljitAllocateRegister(false, ret->sljitLoc))
+            SCANCEL();
+
+        if (sljit_emit_op1(sc, SLJIT_MOV_U8,
+            ret->sljitLoc.reg, ret->sljitLoc.off,
+            val->sljitLoc.reg, val->sljitLoc.tag)) {
+            SCANCEL();
+        }
+    }
+#endif
+
+    return ret;
+}
+
+Instruction *IRBuilder::createGCStoreTag(
+    Instruction *val, Instruction *tag
+) {
+#ifdef JITTEFEX_ENABLE_DEBUG
+    const Type &pType = val->getType();
+    assert(pType.getBaseType() == BaseType::GCPointer ||
+           pType.getBaseType() == BaseType::TaggedWord ||
+           pType.getBaseType() == BaseType::GCStack);
+    assert(pType.getBaseType() == BaseType::Signed ||
+           pType.getBaseType() == BaseType::Unsigned);
+#endif
+
+    Instruction *ret = insertionPoint->append(
+        std::make_unique<GCStoreTagInst>(insertionPoint, val, tag));
 
 #ifdef JITTEFEX_USE_SFJIT
     SJ {
@@ -1361,6 +1433,26 @@ Instruction *IRBuilder::createCall(
         if (sljit_marg_properties(sc, marg, &wordR, &floatR, &stackSpace))
             SCANCEL();
 
+#ifdef JITTEFEX_ENABLE_GC_STACK
+        // Including GC stack space
+        sljit_sw gcStackSpace = 0;
+        sljit_sw gcStackI;
+        for (auto &type : fTy->getParamTypes()) {
+            if (type.getBaseType() == BaseType::GCPointer ||
+                type.getBaseType() == BaseType::TaggedWord) {
+                gcStackSpace++;
+            }
+        }
+
+#ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
+        // Make room for tags
+        sljit_sw gcStackTagI;
+        gcStackSpace += (gcStackSpace + sizeof(size_t) - 1) / sizeof(size_t);
+#endif
+
+        gcStackSpace *= sizeof(size_t);
+#endif
+
         // Compile the function if applicable
         if (callee->getType().getBaseType() == BaseType::Pointer) {
             floc = SLJITLocation{SLJIT_S(SLJIT_NUMBER_OF_SAVED_REGISTERS), 0};
@@ -1389,15 +1481,22 @@ Instruction *IRBuilder::createCall(
 
         }
 
-        // Get the arguments into place
+        // Make space
         if (stackSpace) {
             alloc = sljit_emit_alloca(sc, stackSpace);
             if (!alloc)
                 SCANCEL();
         }
+#ifdef JITTEFEX_ENABLE_GC_STACK
+        if (gcStackSpace) {
+            if (sljit_emit_op1(sc, SLJIT_SUB,
+                SLJIT_GCSP, 0, SLJIT_IMM, gcStackSpace))
+                SCANCEL();
+        }
+#endif
 
 #ifdef JITTEFEX_ENABLE_GC_STACK
-        // JIT stack first
+        // JIT stack is the first argument
         if (sljit_emit_marg_mov(sc, marg, 0, SLJIT_GCSP, 0))
             SCANCEL();
 #endif
@@ -1405,6 +1504,12 @@ Instruction *IRBuilder::createCall(
         argI = floatI = stackI = 0;
 #ifdef JITTEFEX_ENABLE_GC_STACK
         paramI = wordI = 1;
+#ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
+        gcStackI = 1;
+        gcStackTagI = 0;
+#else
+        gcStackI = 0;
+#endif
 #else
         paramI = wordI = 0;
 #endif
@@ -1413,6 +1518,43 @@ Instruction *IRBuilder::createCall(
             bool flt = false;
             loc = args[argI++]->sljitLoc;
             paramI++;
+
+#ifdef JITTEFEX_ENABLE_GC_STACK
+            if (type.getBaseType() == BaseType::GCPointer ||
+                type.getBaseType() == BaseType::TaggedWord) {
+                if (sljit_emit_op1(sc, SLJIT_MOV,
+                    SLJIT_MEM1(SLJIT_GCSP), gcStackI * sizeof(size_t),
+                    loc.reg, loc.off))
+                    SCANCEL();
+                gcStackI++;
+
+#ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
+                if (loc.tag >= 0) {
+                    // It has its own tag, so use it
+                    if (sljit_emit_op1(sc, SLJIT_MOV_U8,
+                        SLJIT_MEM1(SLJIT_GCSP), gcStackTagI,
+                        loc.reg, loc.tag))
+                        SCANCEL();
+                } else {
+                    // Use a generic tag
+                    if (sljit_emit_op1(sc, SLJIT_MOV_U8,
+                        SLJIT_MEM1(SLJIT_GCSP), gcStackTagI,
+                        SLJIT_IMM, 1))
+                        SCANCEL();
+                }
+                gcStackTagI++;
+
+                // And possibly move to the next tag word
+                if (gcStackTagI % sizeof(size_t) == 0) {
+                    gcStackTagI = gcStackI * sizeof(size_t);
+                    gcStackI++;
+                }
+#endif
+
+                continue;
+            }
+#endif
+
             int stype = type.getSLJITType();
 
             switch (stype) {
@@ -1481,12 +1623,30 @@ Instruction *IRBuilder::createCall(
             }
         }
 
+#ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
+        // Cap off the tags if necessary
+        if (gcStackTagI % sizeof(size_t) != 0) {
+            if (sljit_emit_op1(sc, SLJIT_MOV_U8,
+                SLJIT_MEM1(SLJIT_GCSP), gcStackTagI,
+                SLJIT_IMM, 0xFF))
+                SCANCEL();
+        }
+#endif
+
         // Call the actual function
         if (sljit_emit_icall_multiarg(sc, marg, floc.reg, floc.off))
             SCANCEL();
 
         if (stackSpace && sljit_emit_pop(sc, alloc->size))
             SCANCEL();
+
+#ifdef JITTEFEX_ENABLE_GC_STACK
+        if (gcStackSpace) {
+            if (sljit_emit_op1(sc, SLJIT_ADD,
+                SLJIT_GCSP, 0, SLJIT_IMM, gcStackSpace))
+                SCANCEL();
+        }
+#endif
 
         // Save the result
         switch (marg->args[0]) {

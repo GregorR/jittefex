@@ -116,6 +116,8 @@ class IRBuilder {
 
 #ifdef JITTEFEX_ENABLE_GC
 #ifdef JITTEFEX_ENABLE_GC_STACK
+        Instruction *createGCArg(const Type &ty, int idx);
+
         Instruction *createGCAlloca(
             const Type &ty, Instruction *arraySize = nullptr,
             const std::string &name = ""
@@ -133,9 +135,9 @@ class IRBuilder {
         );
 
 #ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
-        Instruction *createGCTag(
-            Instruction *val, Instruction *tag
-        );
+        Instruction *createGCLoadTag(Instruction *val);
+
+        Instruction *createGCStoreTag(Instruction *val, Instruction *tag);
 #endif
 #endif
 
