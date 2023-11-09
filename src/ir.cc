@@ -108,7 +108,7 @@ bool Function::sljitAllocateGCStack(SLJITLocation &loc) {
         sljit_sw offsetWithinBlock = off % sizeof(sljit_sw);
         sljit_sw tagWord = (blockNo + 1) * (sizeof(sljit_sw) + 1) *
             sizeof(sljit_sw);
-        loc.tag = tagWord - sizeof(sljit_sw) + offsetWithinBlock;
+        loc.tag = -tagWord + sizeof(sljit_sw) - offsetWithinBlock;
         off = blockNo * (sizeof(sljit_sw) + 1) + offsetWithinBlock;
     }
 #endif

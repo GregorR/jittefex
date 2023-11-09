@@ -1065,11 +1065,12 @@ Instruction *IRBuilder::createGCStoreTag(
 ) {
 #ifdef JITTEFEX_ENABLE_DEBUG
     const Type &pType = val->getType();
+    const Type &tType = tag->getType();
     assert(pType.getBaseType() == BaseType::GCPointer ||
            pType.getBaseType() == BaseType::TaggedWord ||
            pType.getBaseType() == BaseType::GCStack);
-    assert(pType.getBaseType() == BaseType::Signed ||
-           pType.getBaseType() == BaseType::Unsigned);
+    assert(tType.getBaseType() == BaseType::Signed ||
+           tType.getBaseType() == BaseType::Unsigned);
 #endif
 
     Instruction *ret = insertionPoint->append(
@@ -1489,8 +1490,8 @@ Instruction *IRBuilder::createCall(
         }
 #ifdef JITTEFEX_ENABLE_GC_STACK
         if (gcStackSpace) {
-            if (sljit_emit_op1(sc, SLJIT_SUB,
-                SLJIT_GCSP, 0, SLJIT_IMM, gcStackSpace))
+            if (sljit_emit_op2(sc, SLJIT_SUB,
+                SLJIT_GCSP, 0, SLJIT_GCSP, 0, SLJIT_IMM, gcStackSpace))
                 SCANCEL();
         }
 #endif
@@ -1642,8 +1643,8 @@ Instruction *IRBuilder::createCall(
 
 #ifdef JITTEFEX_ENABLE_GC_STACK
         if (gcStackSpace) {
-            if (sljit_emit_op1(sc, SLJIT_ADD,
-                SLJIT_GCSP, 0, SLJIT_IMM, gcStackSpace))
+            if (sljit_emit_op2(sc, SLJIT_ADD,
+                SLJIT_GCSP, 0, SLJIT_GCSP, 0, SLJIT_IMM, gcStackSpace))
                 SCANCEL();
         }
 #endif

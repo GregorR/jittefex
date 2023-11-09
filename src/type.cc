@@ -181,7 +181,11 @@ void *FunctionType::getSLJITType(void *scvp) const {
     int stype;
 
     // Start with the return type
-    stype = returnType.getSLJITType();
+    stype = returnType.getSLJITType(
+#ifdef JITTEFEX_ENABLE_GC
+        true // return type can be a GC type
+#endif
+    );
     if (stype < 0)
         return NULL;
     ret = sljit_marg_arg(sc, NULL, stype);
