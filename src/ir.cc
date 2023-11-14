@@ -108,13 +108,13 @@ bool Function::sljitAllocateGCStack(SLJITLocation &loc) {
         sljit_sw offsetWithinBlock = off % sizeof(sljit_sw);
         sljit_sw tagWord = (blockNo + 1) * (sizeof(sljit_sw) + 1) *
             sizeof(sljit_sw);
-        loc.tag = -tagWord + sizeof(sljit_sw) - offsetWithinBlock;
+        loc.tag = -tagWord + sizeof(sljit_sw) - offsetWithinBlock - 1;
         off = blockNo * (sizeof(sljit_sw) + 1) + offsetWithinBlock;
     }
 #endif
     off *= sizeof(sljit_sw);
     loc.reg = SLJIT_MEM1(SLJIT_S1 /* FP */);
-    loc.off = -off;
+    loc.off = -off - sizeof(sljit_sw);
     return true;
 }
 #endif
@@ -139,7 +139,7 @@ void Function::sljitReleaseRegister(bool flt, const SLJITLocation &loc) {
 #ifdef JITTEFEX_ENABLE_GC_STACK
     if (loc.reg == SLJIT_MEM1(SLJIT_S1 /* FP */)) {
         // It's on the GC stack
-        sljit_sw off = -loc.off / sizeof(sljit_sw);
+        sljit_sw off = (-loc.off - sizeof(sljit_sw)) / sizeof(sljit_sw);
 #ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
         // Undo all the tag word association
         sljit_sw offsetWithinBlock = off % (sizeof(sljit_sw) + 1);

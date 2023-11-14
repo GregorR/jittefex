@@ -196,6 +196,8 @@ class IRBuilder {
 
         Instruction *createArg(int idx);
 
+        Instruction *createNop();
+
         Instruction *createIntLiteral(const Type &ty, long long val);
 
         Instruction *createFltLiteral(const Type &ty, double val);

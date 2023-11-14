@@ -270,7 +270,8 @@ HANDLE_OTHER_INST(67, Freeze, FreezeInst) // Freeze instruction.
 // Meta-operations
  FIRST_META_INST(1100)
 HANDLE_META_INST(1100, Arg      , ArgInst       )
-  LAST_META_INST(1100)
+HANDLE_META_INST(1101, Nop      , NopInst       )
+  LAST_META_INST(1101)
 
 // GC-related instructions
  FIRST_GC_INST(1200)

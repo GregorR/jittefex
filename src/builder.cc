@@ -1385,8 +1385,13 @@ Instruction *IRBuilder::createCall(
     SJ {
         struct sljit_marg *marg;
         struct sljit_alloca *alloc;
-        SLJITLocation loc, floc;
+        SLJITLocation loc;
+        // Location of the target code
+        SLJITLocation floc;
         bool flocAllocated = false;
+        // Location of the box for the function (i.e., MachineCode object)
+        SLJITLocation fbox;
+        bool fboxAllocated = false;
         sljit_s32 wordR, floatR, stackSpace,
             paramI, argI, wordI, floatI, stackI;
         std::unordered_map<sljit_s32, SLJITLocation> regMap;
@@ -1456,6 +1461,7 @@ Instruction *IRBuilder::createCall(
 
         // Compile the function if applicable
         if (callee->getType().getBaseType() == BaseType::Pointer) {
+            // The function is the return of compilation
             floc = SLJITLocation{SLJIT_S(SLJIT_NUMBER_OF_SAVED_REGISTERS), 0};
             if (wordR >= floc.reg) {
                 // No use, put it on the stack
@@ -1464,14 +1470,32 @@ Instruction *IRBuilder::createCall(
                 flocAllocated = true;
             }
 
+            // And we need a box for it
+            if (!f->sljitAllocateStack(fbox))
+                SCANCEL();
+            fboxAllocated = true;
+
+            // Get the target into the argument register
             if (sljit_emit_op1(sc, SLJIT_MOV_P, SLJIT_R0, 0,
                 callee->sljitLoc.reg, callee->sljitLoc.off))
                 SCANCEL();
+
+            // Call compile
             if (sljit_emit_icall(sc, SLJIT_CALL, SLJIT_ARGS1(P, P),
                 SLJIT_IMM, (sljit_sw) (void *) jittefex::compile))
                 SCANCEL();
-            if (sljit_emit_op1(sc, SLJIT_MOV_P, floc.reg, floc.off,
+
+            // The return is the box
+            if (sljit_emit_op1(sc, SLJIT_MOV_P, fbox.reg, fbox.off,
                 SLJIT_R0, 0))
+                SCANCEL();
+
+            // Get the value out of the box
+            if (sljit_emit_op1(sc, SLJIT_MOV_P, SLJIT_R0, 0,
+                fbox.reg, fbox.off))
+                SCANCEL();
+            if (sljit_emit_op1(sc, SLJIT_MOV_P, floc.reg, floc.off,
+                SLJIT_MEM1(SLJIT_R0), offsetof(MachineCode, code)))
                 SCANCEL();
 
         } else { // CodePointer
@@ -1535,6 +1559,12 @@ Instruction *IRBuilder::createCall(
                     if (sljit_emit_op1(sc, SLJIT_MOV_U8,
                         SLJIT_MEM1(SLJIT_GCSP), gcStackTagI,
                         loc.reg, loc.tag))
+                        SCANCEL();
+                } else if (type.getBaseType() == BaseType::GCPointer) {
+                    // Use a generic GC tag
+                    if (sljit_emit_op1(sc, SLJIT_MOV_U8,
+                        SLJIT_MEM1(SLJIT_GCSP), gcStackTagI,
+                        SLJIT_IMM, 0))
                         SCANCEL();
                 } else {
                     // Use a generic tag
@@ -1690,6 +1720,11 @@ Instruction *IRBuilder::createCall(
 
         if (flocAllocated)
             f->sljitReleaseRegister(false, floc);
+
+        if (fboxAllocated) {
+            // FIXME: Free the code!
+            f->sljitReleaseRegister(false, fbox);
+        }
     }
 #endif
 
@@ -1705,6 +1740,21 @@ Instruction *IRBuilder::createArg(int idx) {
 #ifdef JITTEFEX_USE_SFJIT
     SJ {
         ret->sljitLoc = f->sljitArgLocs[idx];
+    }
+#endif
+
+    return ret;
+}
+
+
+Instruction *IRBuilder::createNop() {
+    Instruction *ret = insertionPoint->append(
+        std::make_unique<NopInst>(insertionPoint));
+
+#ifdef JITTEFEX_USE_SFJIT
+    SJ {
+        if (sljit_emit_op0(sc, SLJIT_NOP))
+            SCANCEL();
     }
 #endif
 

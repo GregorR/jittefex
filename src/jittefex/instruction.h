@@ -521,6 +521,16 @@ class ArgInst : public Instruction {
 };
 
 /**
+ * No-op (mostly just for debugging).
+ */
+class NopInst : public Instruction {
+    public:
+        inline NopInst(BasicBlock *parent)
+            : Instruction(parent, Opcode::Nop, Type::voidType())
+            {}
+};
+
+/**
  * Indexed GC argument (can be unified with Arg in some cases).
  */
 class GCArgInst : public Instruction {
