@@ -261,7 +261,7 @@ class GCAllocaInst : public Instruction {
             BasicBlock *parent, const Type &type,
             Instruction *arraySize = nullptr J_NAME_P
         )
-            : Instruction(parent, Opcode::GCAlloca, Type::gcStackPointerType()
+            : Instruction(parent, Opcode::GCAlloca, Type::gcStackType()
                 J_NAME_A)
             , allocaType{type}
             , arraySize{arraySize}
