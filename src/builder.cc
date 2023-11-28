@@ -1434,6 +1434,12 @@ Instruction *IRBuilder::createCall(
         } 
 
         // Get a location for the result
+#ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
+        if (fTy->getReturnType().getBaseType() == BaseType::TaggedWord) {
+            if (!f->sljitAllocateGCStack(ret->sljitLoc))
+                SCANCEL();
+        } else
+#endif
         if (!f->sljitAllocateRegister(marg->args[0] >= SLJIT_ARG_TYPE_F64,
             ret->sljitLoc))
             SCANCEL();
@@ -1683,28 +1689,47 @@ Instruction *IRBuilder::createCall(
 #endif
 
         // Save the result
-        switch (marg->args[0]) {
-            case SLJIT_ARG_TYPE_W:
-            case SLJIT_ARG_TYPE_32:
-            case SLJIT_ARG_TYPE_P:
-                if (sljit_emit_op1(sc, SLJIT_MOV,
-                    ret->sljitLoc.reg, ret->sljitLoc.off, SLJIT_R0, 0))
-                    SCANCEL();
-                break;
-
-            case SLJIT_ARG_TYPE_F64:
-            case SLJIT_ARG_TYPE_F32:
-                if (sljit_emit_fop1(sc, SLJIT_MOV_F64,
-                    ret->sljitLoc.reg, ret->sljitLoc.off, SLJIT_FR0, 0))
-                    SCANCEL();
-                break;
-
-            case SLJIT_ARG_TYPE_VOID:
-                // Harmless
-                break;
-
-            default:
+#ifdef JITTEFEX_ENABLE_GC_TAGGED_STACK
+        /* Return type of GC tagged is special. Can't return in a single word,
+         * so instead returns in the stack. */
+        if (fTy->getReturnType().getBaseType() == BaseType::TaggedWord) {
+            if (!gcStackSpace)
+                abort();
+            if (sljit_emit_op1(sc, SLJIT_MOV,
+                ret->sljitLoc.reg, ret->sljitLoc.off,
+                SLJIT_MEM1(SLJIT_GCSP), -gcStackSpace + sizeof(size_t)))
                 SCANCEL();
+            if (sljit_emit_op1(sc, SLJIT_MOV_U8,
+                ret->sljitLoc.reg, ret->sljitLoc.tag,
+                SLJIT_MEM1(SLJIT_GCSP), -gcStackSpace))
+                SCANCEL();
+        } else
+
+#endif
+        {
+            switch (marg->args[0]) {
+                case SLJIT_ARG_TYPE_W:
+                case SLJIT_ARG_TYPE_32:
+                case SLJIT_ARG_TYPE_P:
+                    if (sljit_emit_op1(sc, SLJIT_MOV,
+                        ret->sljitLoc.reg, ret->sljitLoc.off, SLJIT_R0, 0))
+                        SCANCEL();
+                    break;
+
+                case SLJIT_ARG_TYPE_F64:
+                case SLJIT_ARG_TYPE_F32:
+                    if (sljit_emit_fop1(sc, SLJIT_MOV_F64,
+                        ret->sljitLoc.reg, ret->sljitLoc.off, SLJIT_FR0, 0))
+                        SCANCEL();
+                    break;
+
+                case SLJIT_ARG_TYPE_VOID:
+                    // Harmless
+                    break;
+
+                default:
+                    SCANCEL();
+            }
         }
 
         // Then restore the registers that we saved
