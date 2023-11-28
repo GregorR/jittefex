@@ -1239,7 +1239,10 @@ Instruction *IRBuilder::createICmpNE(
     Instruction *l, Instruction *r, const std::string &name
 ) {
     (void) name;
-    assert(l->getType() == r->getType() && l->getType().isInteger());
+    assert(l->getType() == r->getType() && (
+        l->getType().isInteger() ||
+        l->getType().isAnyPointer()
+    ));
     Instruction *ret = insertionPoint->append(
         std::make_unique<ICmpInst>(
             insertionPoint, l, r,
